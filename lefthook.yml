@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: false
+  commands:
+    fmt:
+      glob: "*.go"
+      run: golangci-lint fmt {staged_files}
+      stage_fixed: true
+    lint:
+      run: golangci-lint run ./...
+
+commit-msg:
+  commands:
+    conventional:
+      run: ./scripts/commit-msg.sh {1}

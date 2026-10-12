@@ -1,0 +1,12 @@
+bin/
+dist/
+coverage.out
+tmp/
+.air.toml
+.env
+.env.*
+!.env.example
+*.test
+.DS_Store
+__pycache__/
+*.py[cod]

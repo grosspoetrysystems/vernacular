@@ -1,0 +1,18 @@
+# Vernacular currently has one maintainer.
+* @thekidnamedkd
+
+/.github/workflows/ @thekidnamedkd
+/.github/CODEOWNERS @thekidnamedkd
+/scripts/validate_pr.py @thekidnamedkd
+/tests/test_validate_pr.py @thekidnamedkd
+/SECURITY.md @thekidnamedkd
+/CONTRIBUTING.md @thekidnamedkd
+/MAINTAINERS.md @thekidnamedkd
+/CODE_OF_CONDUCT.md @thekidnamedkd
+/go.mod @thekidnamedkd
+/go.sum @thekidnamedkd
+/AGENTS.md @thekidnamedkd
+/lefthook.yml @thekidnamedkd
+/.golangci.yml @thekidnamedkd
+/scripts/commit-msg.sh @thekidnamedkd
+/scripts/configure_repository.py @thekidnamedkd
