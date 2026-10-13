@@ -2,11 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type result struct {
@@ -99,6 +101,41 @@ func TestInitReportsAbsoluteCanonAndPathResolves(t *testing.T) {
 	}
 	if out := mustRun(t, "status"); !strings.Contains(out, "Canon  "+repo) {
 		t.Errorf("status:\n%s", out)
+	}
+}
+
+func TestStatusListsNewestFilesFirstWithinLimit(t *testing.T) {
+	setup(t)
+	mustRun(t, "init")
+	apparatus := mustRun(t, "path", "apparatus")
+	base := time.Now().Add(-72 * time.Hour)
+	for i := range recentLimit + 2 {
+		p := filepath.Join(apparatus, "notes", fmt.Sprintf("n%02d.md", i))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		mod := base.Add(time.Duration(i) * time.Hour)
+		if err := os.Chtimes(p, mod, mod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(apparatus, ".DS_Store"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out := mustRun(t, "status")
+	newest, oldestListed, firstHidden := "notes/n11.md", "notes/n02.md", "notes/n01.md"
+	if i, j := strings.Index(out, newest), strings.Index(out, oldestListed); i < 0 || j < 0 || i > j {
+		t.Errorf("want %s listed before %s:\n%s", newest, oldestListed, out)
+	}
+	if strings.Contains(out, firstHidden) || strings.Contains(out, ".DS_Store") {
+		t.Errorf("listed past the limit or a dotfile:\n%s", out)
+	}
+	if !strings.Contains(out, "13 files, 1 directory") || !strings.Contains(out, "3 more files not listed") {
+		t.Errorf("counts or remainder wrong:\n%s", out)
 	}
 }
 

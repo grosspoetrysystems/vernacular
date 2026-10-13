@@ -4,17 +4,29 @@ import (
 	"errors"
 	"io/fs"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 )
 
-// Count is the number of files and directories under a space, excluding the space root and .git.
-type Count struct {
+// Tree summarizes a space: counts of files and directories (excluding the space root and .git)
+// and its most recently modified files, newest first.
+type Tree struct {
 	Files, Dirs int
+	Recent      []Item
 	Missing     bool
 }
 
-// CountTree counts entries under dir without following symlinks.
-func CountTree(dir string) (Count, error) {
-	var c Count
+// Item is a file in a space, by path relative to the space root.
+type Item struct {
+	Path string
+	Mod  time.Time
+}
+
+// ScanTree summarizes dir without following symlinks, keeping at most n recent files. Dotfiles
+// are counted but never listed.
+func ScanTree(dir string, n int) (Tree, error) {
+	var t Tree
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -24,14 +36,27 @@ func CountTree(dir string) (Count, error) {
 		case d.IsDir() && d.Name() == ".git":
 			return filepath.SkipDir
 		case d.IsDir():
-			c.Dirs++
+			t.Dirs++
 		default:
-			c.Files++
+			t.Files++
+			if strings.HasPrefix(d.Name(), ".") {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(dir, p)
+			t.Recent = append(t.Recent, Item{rel, info.ModTime()})
 		}
 		return nil
 	})
 	if errors.Is(err, fs.ErrNotExist) {
-		return Count{Missing: true}, nil
+		return Tree{Missing: true}, nil
 	}
-	return c, err
+	sort.Slice(t.Recent, func(i, j int) bool { return t.Recent[i].Mod.After(t.Recent[j].Mod) })
+	if len(t.Recent) > n {
+		t.Recent = t.Recent[:n]
+	}
+	return t, err
 }

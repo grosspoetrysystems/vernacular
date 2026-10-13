@@ -9,6 +9,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/grosspoetrysystems/vernacular/internal/workspace"
 )
@@ -209,7 +210,10 @@ func printSpaces(w io.Writer, ws *workspace.Workspace) {
 // agentSnippet carries no paths: workspace locations are private and machine-specific.
 const agentSnippet = `## Vernacular workspace
 
-This repository is project canon.
+This repository is project canon. Its working context lives outside it:
+product documents, decisions, research, experiments, and earlier agents'
+reports. Before planning work or reporting on status or direction, list
+and read what is relevant under ` + "`vern path apparatus`" + ` and ` + "`vern path working`" + `.
 
 Do not create exploratory reports, plans, research, benchmark output,
 or temporary Markdown in this repository unless explicitly requested.
@@ -246,22 +250,46 @@ func runStatus(args []string, stdout io.Writer) error {
 	} else {
 		_, _ = fmt.Fprintln(stdout, "Canon  unknown here (run vern status inside the repository)")
 	}
+	now := time.Now()
 	for _, s := range []struct{ name, label, dir string }{
 		{"apparatus", ws.Apparatus, ws.Apparatus},
 		{"working", ws.Working, ws.Working},
 	} {
-		c, err := workspace.CountTree(s.dir)
+		tr, err := workspace.ScanTree(s.dir, recentLimit)
 		if err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(stdout, "\n%s%s  %s\n", strings.ToUpper(s.name[:1]), s.name[1:], s.label)
-		if c.Missing {
+		if tr.Missing {
 			_, _ = fmt.Fprintln(stdout, "  missing")
 			continue
 		}
-		_, _ = fmt.Fprintf(stdout, "  %s\n  %s\n", plural(c.Files, "file"), plural(c.Dirs, "directory"))
+		_, _ = fmt.Fprintf(stdout, "  %s, %s\n", plural(tr.Files, "file"), plural(tr.Dirs, "directory"))
+		for _, it := range tr.Recent {
+			_, _ = fmt.Fprintf(stdout, "  %8s  %s\n", age(now.Sub(it.Mod)), filepath.ToSlash(it.Path))
+		}
+		if more := tr.Files - len(tr.Recent); more > 0 && len(tr.Recent) == recentLimit {
+			_, _ = fmt.Fprintf(stdout, "  %8s  … %s not listed\n", "", plural(more, "more file"))
+		}
 	}
 	return nil
+}
+
+// recentLimit bounds how many files status lists per space: enough to orient an agent, short
+// enough to read at a glance.
+const recentLimit = 10
+
+func age(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
 }
 
 func runPromote(args []string, stdin io.Reader, stdout io.Writer) error {

@@ -2,7 +2,10 @@
 
 ## Vernacular workspace
 
-This repository is project canon.
+This repository is project canon. Its working context lives outside it:
+product documents, decisions, research, experiments, and earlier agents'
+reports. Before planning work or reporting on status or direction, list
+and read what is relevant under `vern path apparatus` and `vern path working`.
 
 Do not create exploratory reports, plans, research, benchmark output,
 or temporary Markdown in this repository unless explicitly requested.
