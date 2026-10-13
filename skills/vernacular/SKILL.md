@@ -38,6 +38,8 @@ install it yourself.
    (top-level folder of apparatus) that matches its kind — `ls "$(vern path apparatus)"` —
    or propose a new shelf if none fits. Say the move in one line ("`notes/` → `research/`"),
    then `mv`; never overwrite, never rename files, and ask first if the path is tracked.
+6. Asked to tidy working, or it has become a pile: offer once to sort it onto shelves
+   ("Tidying working" in `references/adopt.md`).
 
 ### Not set
 

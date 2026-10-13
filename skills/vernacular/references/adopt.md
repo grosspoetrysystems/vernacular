@@ -88,7 +88,7 @@ folder somewhere else, an app?"
 | None / not now | Stop. Back to the task. |
 | Some kinds picked | Step 4, with only those kinds. |
 | A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
-| An app or a notepad | Write `$(vern path apparatus)/README.md` with one line per place: what lives there and how to reach it. Offer to paste anything they want kept as files. |
+| An app or a notepad | Add an *Elsewhere* section to `$(vern path apparatus)/README.md`: one line per place, what lives there and how to reach it. Offer to paste anything they want kept as files. |
 
 ## 4. Shelve and move
 
@@ -102,7 +102,10 @@ Propose the result as a tree before touching anything:
         competitors/   ← notes/competitor-*.md
 
 - Shelves come from the material, not a fixed taxonomy; use the human's words where they
-  have them. File names never change.
+  have them. Add a shelf when material needs one, not to fill a set. File names never change.
+- Material that is already organized keeps its organization: a folder of shelves moves
+  shelf by shelf as it is, and cohesive trees (a benchmark run, an artifact set, a spike)
+  move intact. Propose regrouping only for loose files.
 - Scratch, logs, and one-off output go to `vern path working` instead, said in the preview.
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
@@ -110,6 +113,14 @@ Propose the result as a tree before touching anything:
 On yes (or after their edits), say "Porting now." and, for each row, `mkdir -p` the shelf and `mv` the source into
 it. Never overwrite: if a destination exists, stop and ask. Tracked files move only with
 explicit approval, and the deletion then shows in `git status` for the human to commit.
+
+Then write or update the shelf index, `$(vern path apparatus)/README.md`, so a cold agent
+knows what each shelf holds before opening it. Keep an existing index's wording; add rows
+for new shelves only:
+
+    | Shelf | Contents | How to use it |
+    |---|---|---|
+    | benchmarks/ | Benchmark runs and the harness to replay them | Rerun before citing; old numbers are not current |
 
 Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
 fix, and an undo block that reverses every move, with literal absolute paths so it can be
@@ -142,3 +153,15 @@ is a ticket, not a workaround.
 `check.sh --durable` additionally proves the attachment survives a reclone,
 `git clean -xfd`, a moved repository, a worktree, and a lost `~/.vern`, on a throwaway
 clone. It copies the repository, so offer it rather than running it by default.
+
+## Tidying working
+
+Working is scratch and makes no promise of order. When the human asks to tidy it, or
+`vern status` shows a pile of loose files at its top level, offer once:
+
+> Working has 30 loose files: agent reports, probe logs, a few drafts. Want me to sort
+> them? Drafts worth keeping go to apparatus shelves; the rest onto shelves in working.
+
+Same rules as adoption: a pick list by kind, a preview tree, `mv` only, no renames, no
+deletion, an undo block in the record. Nothing is thrown away; clearing working out stays
+the human's call.
