@@ -148,11 +148,6 @@ jobs:
 
       - name: Publish to npm
         run: node scripts/publish-npm.mjs
-        env:
-          # Bootstrap only: npm trusted publishers can be configured only on a package that
-          # already exists. Publish the first release with a short-lived NPM_TOKEN in the release
-          # environment, run `npm trust github`, then delete the secret and these two lines.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   smoke-npm:
     needs: [release, publish-npm]
