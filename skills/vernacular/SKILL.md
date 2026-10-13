@@ -34,6 +34,10 @@ install it yourself.
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
+5. Asked to port something from the repository into the workspace: put it on the shelf
+   (top-level folder of apparatus) that matches its kind — `ls "$(vern path apparatus)"` —
+   or propose a new shelf if none fits. Say the move in one line ("`notes/` → `research/`"),
+   then `mv`; never overwrite, never rename files, and ask first if the path is tracked.
 
 ### Not set
 

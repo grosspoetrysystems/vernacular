@@ -107,7 +107,7 @@ Propose the result as a tree before touching anything:
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
 
-On yes (or after their edits): for each row, `mkdir -p` the shelf and `mv` the source into
+On yes (or after their edits), say "Porting now." and, for each row, `mkdir -p` the shelf and `mv` the source into
 it. Never overwrite: if a destination exists, stop and ask. Tracked files move only with
 explicit approval, and the deletion then shows in `git status` for the human to commit.
 
@@ -126,11 +126,14 @@ the human: editing it is a project change, so leave it unless they ask.
 
     sh "<this skill's directory>/scripts/check.sh"     # fast; reads only
 
-Then tell the human, in three lines, and go back to the original task:
+Then tell the human, in a few short lines, and go back to the original task. For example:
 
-- `git status` — the repository is clean (or: only the tracked deletions you approved).
-- `vern status` — your material is here; agents read it before planning.
-- Undo: the block in `adoption-YYYY-MM-DD.md`.
+> Ported benchmarks, ADRs, and planning docs into your workspace. `git status` is clean;
+> `vern status` shows where they went, and agents read them before planning.
+> To port anything else later, just ask, or from a terminal:
+> `mv PATH "$(vern path apparatus)/"`. Undo is in `adoption-YYYY-MM-DD.md`.
+
+If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
 
 Report `check.sh` output only if something failed. Friction that needs a change to `vern`
 is a ticket, not a workaround.
