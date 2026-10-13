@@ -7,7 +7,7 @@ import subprocess
 from typing import Any
 
 MODES = ("solo", "contributor", "team")
-REQUIRED_CHECKS = ("test-validator", "validate-metadata", "check")
+REQUIRED_CHECKS = ("test-validator", "validate-metadata", "check", "DCO")
 
 
 def protection(mode: str) -> dict[str, Any]:
