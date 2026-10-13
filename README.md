@@ -43,9 +43,8 @@ Or link it by hand from a checkout of this repository:
 | Harness | User skill directory |
 |---|---|
 | Claude Code | `~/.claude/skills/` |
-| Codex, pi | `~/.agents/skills/` |
+| Codex, pi, OMP | `~/.agents/skills/` |
 | Antigravity CLI | `~/.gemini/antigravity-cli/skills/` |
-| OMP | `~/.omp/agent/skills/` |
 | Cursor | `~/.cursor/skills/` |
 | GitHub Copilot | `~/.copilot/skills/` |
 | Gemini CLI | `~/.gemini/skills/` |
