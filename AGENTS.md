@@ -26,4 +26,6 @@ go test -cover ./...
 python3 tests/test_validate_pr.py
 ```
 
+The validator tests need Python 3.10 or newer; on macOS the system `python3` is 3.9, so use a newer interpreter explicitly. `golangci-lint` is v2.
+
 Keep the CLI to `init`, `attach`, `path`, `status`, and `promote` unless a new command has proven itself in use. Shell out to `git`; do not add a Git library.
