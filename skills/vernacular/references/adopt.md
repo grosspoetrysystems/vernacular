@@ -111,8 +111,8 @@ Propose the result as a tree before touching anything:
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
 
-On yes (or after their edits), say "Porting now." and run `vern stash SRC SHELF` for each
-row (`--working` for rows going to working). It keeps the name, never overwrites, and
+On yes (or after their edits), say "Porting now." and run `vern stash --apparatus SRC SHELF`
+for each apparatus row, `vern stash SRC [SHELF]` for rows going to working. It keeps the name, never overwrites, and
 refuses tracked paths; pass `--tracked` only for files the human approved, whose deletion
 then shows in `git status` for them to commit. If it refuses, stop and ask.
 
@@ -144,7 +144,8 @@ Then tell the human, in a few short lines, and go back to the original task. For
 
 > Ported benchmarks, ADRs, and planning docs into your workspace. `git status` is clean;
 > `vern status` shows where they went, and agents read them before planning.
-> To port anything else later, just ask, or from a terminal: `vern stash PATH SHELF`.
+> To port anything else later, just ask, or from a terminal: `vern stash --apparatus PATH SHELF`
+> (without `--apparatus`, it goes to working as scratch).
 > Undo is in `adoption-YYYY-MM-DD.md`.
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".

@@ -25,9 +25,9 @@ Usage:
   vern status                          show the workspace and what exists outside canon
   vern promote [--yes] [--allow-findings] SRC DEST
                                        copy SRC from apparatus/working to DEST in canon
-  vern stash [--working] [--tracked] SRC [SHELF]
-                                       move SRC out of canon onto a shelf in apparatus
-                                       (or working)
+  vern stash [--apparatus] [--tracked] SRC [SHELF]
+                                       move SRC out of canon onto a shelf in working
+                                       (or apparatus)
   vern --version                       print the version
 
 init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
@@ -45,7 +45,7 @@ refuses files that look like secrets or local paths unless --allow-findings is
 given, and asks for confirmation unless --yes is given.
 
 stash is the opposite: SRC must be inside an attached repository, and moves to
-apparatus/SHELF/ (or working/SHELF/ with --working) keeping its name. It never
+working/SHELF/ (or apparatus/SHELF/ with --apparatus) keeping its name. It never
 overwrites, refuses paths with tracked files unless --tracked is given, and
 prints the command that undoes it.
 `
@@ -388,7 +388,7 @@ func runPromote(args []string, stdin io.Reader, stdout io.Writer) error {
 func runStash(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("stash", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	toWorking := fs.Bool("working", false, "stash into working instead of apparatus")
+	toApparatus := fs.Bool("apparatus", false, "stash into apparatus, to keep, instead of working")
 	tracked := fs.Bool("tracked", false, "allow stashing tracked files (Git then shows them deleted)")
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -401,7 +401,7 @@ func runStash(args []string, stdout io.Writer) error {
 	if len(pos) == 2 {
 		shelf = pos[1]
 	}
-	from, dst, err := workspace.Stash(pos[0], shelf, *toWorking, *tracked)
+	from, dst, err := workspace.Stash(pos[0], shelf, *toApparatus, *tracked)
 	if err != nil {
 		return err
 	}

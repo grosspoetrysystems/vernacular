@@ -295,7 +295,7 @@ func TestStash(t *testing.T) {
 	write(t, filepath.Join(unlinked, "notes.md"), "x\n")
 
 	t.Run("directory moves intact onto a nested shelf", func(t *testing.T) {
-		_, dst, err := Stash(filepath.Join(repo, ".substrate", "adr"), "research/old", false, false)
+		_, dst, err := Stash(filepath.Join(repo, ".substrate", "adr"), "research/old", true, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -312,13 +312,13 @@ func TestStash(t *testing.T) {
 
 	t.Run("glob-like name is matched literally", func(t *testing.T) {
 		// As a pathspec, "a*.md" would match the tracked ab.md and refuse an untracked file.
-		if _, _, err := Stash(filepath.Join(repo, "a*.md"), "", true, false); err != nil {
+		if _, _, err := Stash(filepath.Join(repo, "a*.md"), "", false, false); err != nil {
 			t.Fatal(err)
 		}
 	})
 
-	t.Run("working without a shelf", func(t *testing.T) {
-		if _, dst, err := Stash(filepath.Join(repo, "scratch.log"), "", true, false); err != nil || dst != filepath.Join(ws.Working, "scratch.log") {
+	t.Run("working by default, without a shelf", func(t *testing.T) {
+		if _, dst, err := Stash(filepath.Join(repo, "scratch.log"), "", false, false); err != nil || dst != filepath.Join(ws.Working, "scratch.log") {
 			t.Fatalf("dst %s, err %v", dst, err)
 		}
 	})
@@ -348,7 +348,7 @@ func TestStash(t *testing.T) {
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := Stash(tc.src, tc.shelf, false, false)
+			_, _, err := Stash(tc.src, tc.shelf, true, false)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("err = %v, want %q", err, tc.want)
 			}

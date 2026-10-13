@@ -206,7 +206,7 @@ func TestStashPrintsAWorkingUndo(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := mustRun(t, "stash", "it's notes", "research")
-	if _, err := os.Stat(filepath.Join(mustRun(t, "path", "apparatus"), "research", "it's notes", "a.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(mustRun(t, "path", "working"), "research", "it's notes", "a.md")); err != nil {
 		t.Fatalf("not stashed: %v\n%s", err, out)
 	}
 	undo := out[strings.Index(out, "Undo: ")+len("Undo: "):]

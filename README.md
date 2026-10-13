@@ -85,7 +85,8 @@ vern init                 # attach this repository to a new workspace
 vern path working         # absolute path for scratch
 vern path apparatus       # absolute path for durable non-canonical work
 vern status               # workspace, spaces, and what exists outside canon
-vern stash PLAN.md plans  # move PLAN.md out of the repository onto the apparatus "plans" shelf
+vern stash run.log logs   # move run.log out of the repository onto the "logs" shelf in working
+vern stash --apparatus PLAN.md plans   # keep it: onto the "plans" shelf in apparatus
 vern promote "$(vern path apparatus)/notes/design.md" docs/design.md
 ```
 
@@ -100,8 +101,9 @@ commits; it refuses destinations the repository ignores, and refuses files that 
 secrets or local paths unless `--allow-findings` is given.
 
 `vern stash` is the opposite: it moves a path out of the repository onto a shelf (a top-level
-folder) in apparatus, or in working with `--working`, keeping its name. It never overwrites,
-refuses tracked paths unless `--tracked` is given, and prints the `mv` that undoes it.
+folder) in working, or in apparatus with `--apparatus` for material worth keeping, keeping its
+name. It never overwrites, refuses tracked paths unless `--tracked` is given, and prints the
+`mv` that undoes it.
 
 ## Attachment
 

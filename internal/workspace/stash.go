@@ -9,12 +9,12 @@ import (
 	"syscall"
 )
 
-// Stash moves src out of the attached checkout containing it into the workspace's apparatus,
-// or working when toWorking, on the shelf named by shelf ("" for the space itself), keeping its
+// Stash moves src out of the attached checkout containing it into the workspace's working, or
+// apparatus when toApparatus, on the shelf named by shelf ("" for the space itself), keeping its
 // name. It is the opposite of promotion: canon to workspace, a move instead of a copy. It never
 // overwrites, and refuses paths with tracked files unless tracked. It returns the resolved
 // source and the destination.
-func Stash(src, shelf string, toWorking, tracked bool) (from, to string, err error) {
+func Stash(src, shelf string, toApparatus, tracked bool) (from, to string, err error) {
 	s, err := realPath(src)
 	if err != nil {
 		return "", "", err
@@ -61,9 +61,9 @@ func Stash(src, shelf string, toWorking, tracked bool) (from, to string, err err
 		}
 	}
 
-	space := ws.Apparatus
-	if toWorking {
-		space = ws.Working
+	space := ws.Working
+	if toApparatus {
+		space = ws.Apparatus
 	}
 	if shelf != "" && !filepath.IsLocal(shelf) {
 		return "", "", fmt.Errorf("shelf %q must be a relative path inside the space", shelf)
