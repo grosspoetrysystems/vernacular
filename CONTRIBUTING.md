@@ -101,3 +101,4 @@ The accountable human or authorized organization, not an AI system, makes that c
 ## Security and conduct
 
 Report vulnerabilities privately as described in `SECURITY.md`. Follow `CODE_OF_CONDUCT.md` in all project spaces.
+
