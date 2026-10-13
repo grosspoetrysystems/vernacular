@@ -112,15 +112,16 @@ it. Never overwrite: if a destination exists, stop and ask. Tracked files move o
 explicit approval, and the deletion then shows in `git status` for the human to commit.
 
 Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
-fix, and an undo block that reverses every move:
+fix, and an undo block that reverses every move, with literal absolute paths so it can be
+pasted as is:
 
 ```sh
-mv "$APPARATUS/plans/PLAN.md" "$CANON/PLAN.md"
+mkdir -p "/Users/me/code/foo" && mv "/Users/me/.vern/data/vrn_7f29c1a0/apparatus/plans/PLAN.md" "/Users/me/code/foo/PLAN.md"
 ```
 
-Ignore rules that only existed to hide what moved now match nothing. Offer to remove those
-in `.git/info/exclude` (local, leaves no trace). List those in the tracked `.gitignore` for
-the human: editing it is a project change, so leave it unless they ask.
+Leave ignore rules alone, even ones that matched only what moved: a rule like `/notes` may
+be there for future material, and editing the tracked `.gitignore` is a project change. List
+them in the record; edit one only if the human asks.
 
 ## 5. Finish
 

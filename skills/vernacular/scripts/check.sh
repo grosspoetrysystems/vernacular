@@ -27,6 +27,7 @@ seen() {
     'index($0, id "  ") == 1 && substr($0, length($0) - length(want) + 1) == want { f = 1 } END { exit !f }'
 }
 
+case ${1:-} in '' | --durable) ;; *) echo "usage: check.sh [--durable]" >&2; exit 2 ;; esac
 command -v vern >/dev/null || { echo "vern is not on PATH" >&2; exit 1; }
 canon=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not inside a Git repository" >&2; exit 1; }
 canon=$(cd "$canon" && pwd -P)
