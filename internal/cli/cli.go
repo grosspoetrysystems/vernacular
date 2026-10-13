@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ Usage:
   vern status                          show the workspace and what exists outside canon
   vern promote [--yes] [--allow-findings] SRC DEST
                                        copy SRC from apparatus/working to DEST in canon
+  vern --version                       print the version
 
 init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
 registers it in ~/.vern/workspaces/<id>, and stores the id in the repository's
@@ -39,6 +41,20 @@ never overwrites, stages, or commits. It refuses destinations canon ignores,
 refuses files that look like secrets or local paths unless --allow-findings is
 given, and asks for confirmation unless --yes is given.
 `
+
+// Version is set at release build time with -ldflags "-X …/internal/cli.Version=X.Y.Z".
+var Version = "dev"
+
+// version reports the release version, or the module version for `go install …@vX.Y.Z` builds.
+func version() string {
+	if Version != "dev" {
+		return Version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return strings.TrimPrefix(bi.Main.Version, "v")
+	}
+	return Version
+}
 
 // Run executes vern with args (excluding the program name) and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -60,6 +76,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = runPromote(args[1:], stdin, stdout)
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stdout, usage)
+		return 0
+	case "--version", "-v":
+		_, _ = fmt.Fprintln(stdout, version())
 		return 0
 	default:
 		_, _ = fmt.Fprintf(stderr, "vern: unknown command %q\n\n%s", args[0], usage)
