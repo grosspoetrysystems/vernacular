@@ -52,7 +52,7 @@ func Stash(src, shelf string, toWorking, tracked bool) (from, to string, err err
 	}
 	if !tracked {
 		rel, _ := filepath.Rel(top, s)
-		files, err := Git(top, "ls-files", "--", rel)
+		files, err := Git(top, "--literal-pathspecs", "ls-files", "--", rel)
 		if err != nil {
 			return "", "", err
 		}

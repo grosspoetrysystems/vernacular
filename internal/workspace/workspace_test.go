@@ -286,7 +286,9 @@ func TestStash(t *testing.T) {
 	write(t, filepath.Join(repo, "PLAN.md"), "plan\n")
 	write(t, filepath.Join(repo, "scratch.log"), "log\n")
 	write(t, filepath.Join(repo, "README.md"), "canon\n")
-	run(t, repo, "add", "README.md")
+	write(t, filepath.Join(repo, "ab.md"), "tracked\n")
+	write(t, filepath.Join(repo, "a*.md"), "untracked, glob-like name\n")
+	run(t, repo, "add", "README.md", "ab.md")
 	run(t, repo, "commit", "-q", "-m", "readme")
 	write(t, filepath.Join(ws.Apparatus, "plans", "PLAN.md"), "already shelved\n")
 	unlinked := newRepo(t, "unlinked", true)
@@ -305,6 +307,13 @@ func TestStash(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(repo, ".substrate", "adr")); !os.IsNotExist(err) {
 			t.Errorf("source should be gone after stash: %v", err)
+		}
+	})
+
+	t.Run("glob-like name is matched literally", func(t *testing.T) {
+		// As a pathspec, "a*.md" would match the tracked ab.md and refuse an untracked file.
+		if _, _, err := Stash(filepath.Join(repo, "a*.md"), "", true, false); err != nil {
+			t.Fatal(err)
 		}
 	})
 
