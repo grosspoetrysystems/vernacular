@@ -21,7 +21,7 @@ back.
 ## Install
 
 ```sh
-npm install --global @grosspoetrysystems/vernacular   # prebuilt binary, includes the agent skill
+npm install --global @grosspoetrysystems/vernacular   # from v0.1.0; prebuilt binary and the agent skill
 go install github.com/grosspoetrysystems/vernacular/cmd/vern@latest
 ```
 

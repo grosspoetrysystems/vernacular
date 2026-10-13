@@ -146,13 +146,12 @@ jobs:
           name: npm-${{ needs.release.outputs.version }}
           path: .release/npm/
 
-      - name: Publish platform packages, then wrapper
+      - name: Publish to npm
         run: node scripts/publish-npm.mjs
         env:
-          # Bootstrap only: npm trusted publishers can be configured only on packages that
-          # already exist. Publish the first release with a short-lived NPM_TOKEN in the release
-          # environment, configure `npm trust github` for every package, then delete the secret
-          # and these two lines.
+          # Bootstrap only: npm trusted publishers can be configured only on a package that
+          # already exists. Publish the first release with a short-lived NPM_TOKEN in the release
+          # environment, run `npm trust github`, then delete the secret and these two lines.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   smoke-npm:
@@ -173,33 +172,15 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ needs.release.outputs.version }}"
-          PACKAGES=(
-            vernacular
-            vernacular-darwin-arm64
-            vernacular-darwin-x64
-            vernacular-linux-arm64
-            vernacular-linux-x64
-            vernacular-win32-arm64
-            vernacular-win32-x64
-          )
-          CACHE="$(mktemp -d)"
+          SPEC="@grosspoetrysystems/vernacular@${VERSION}"
           for attempt in $(seq 1 60); do
-            visible=true
-            for package in "${PACKAGES[@]}"; do
-              if ! npm view "@grosspoetrysystems/${package}@${VERSION}" version --cache "${CACHE}" --prefer-online >/dev/null 2>&1; then
-                visible=false
-                break
-              fi
-            done
-            if "${visible}"; then
+            if npm view "${SPEC}" version --prefer-online >/dev/null 2>&1; then
               break
             fi
             if [ "${attempt}" = 60 ]; then
-              echo "npm did not expose every Vernacular package at ${VERSION} within ten minutes." >&2
+              echo "npm did not expose ${SPEC} within ten minutes." >&2
               exit 1
             fi
-            rm -rf "${CACHE}"
-            CACHE="$(mktemp -d)"
             sleep 10
           done
           mkdir smoke && cd smoke
