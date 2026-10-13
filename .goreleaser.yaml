@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+dist: .release
+
+project_name: vernacular
+
+builds:
+  - id: vern
+    binary: vern
+    main: ./cmd/vern
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/grosspoetrysystems/vernacular/internal/cli.Version={{ .Version }}
+
+archives:
+  - id: vern
+    ids:
+      - vern
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - src: LICENSE
+      - src: README.md
+      # The agent skill ships with the binary; see README "Agents".
+      - src: skills/vernacular/SKILL.md
+        dst: skills/vernacular
+        strip_parent: true
+
+checksum:
+  name_template: checksums.txt
+
+signs:
+  # Keyless cosign signature over the checksums file (GitHub OIDC in CI).
+  - cmd: cosign
+    artifacts: checksum
+    certificate: "${artifact}.pem"
+    output: true
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+      - "--yes"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: grosspoetrysystems
+    name: vernacular
+  # Keep releases private until assets, signatures, and provenance are inspected.
+  draft: true
+  use_existing_draft: true
+  replace_existing_artifacts: true
+  prerelease: auto

@@ -21,10 +21,14 @@ back.
 ## Install
 
 ```sh
+npm install --global @grosspoetrysystems/vernacular   # from v0.1.0; prebuilt binary and the agent skill
 go install github.com/grosspoetrysystems/vernacular/cmd/vern@latest
 ```
 
-`vern` must be on your `PATH` (`go install` puts it in `$(go env GOPATH)/bin`).
+`vern` must be on your `PATH` (`go install` puts it in `$(go env GOPATH)/bin`). Release
+archives on the [releases page](https://github.com/grosspoetrysystems/vernacular/releases) carry a
+cosign-signed checksum file and GitHub build provenance (`gh attestation verify FILE --repo
+grosspoetrysystems/vernacular`); npm packages are published with provenance.
 
 ## Agents
 

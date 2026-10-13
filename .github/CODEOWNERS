@@ -16,3 +16,6 @@
 /.golangci.yml @thekidnamedkd
 /scripts/commit-msg.sh @thekidnamedkd
 /scripts/configure_repository.py @thekidnamedkd
+/scripts/package-npm.mjs @thekidnamedkd
+/scripts/publish-npm.mjs @thekidnamedkd
+/.goreleaser.yaml @thekidnamedkd
