@@ -38,8 +38,7 @@ install it yourself.
    (top-level folder of apparatus) that matches its kind — `ls "$(vern path apparatus)"` —
    or propose a new shelf if none fits. Say the move in one line ("`notes/` → `research/`"),
    then `vern stash PATH SHELF` (`--working` for scratch). It never overwrites or renames
-   and refuses tracked paths; add `--tracked` only after the human approves. A `vern`
-   without `stash` (before v0.2.0): `mv` with the same rules.
+   and refuses tracked paths; add `--tracked` only after the human approves.
 6. Asked to tidy working, or it has become a pile: offer once to sort it onto shelves
    ("Tidying working" in `references/adopt.md`).
 

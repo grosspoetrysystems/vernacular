@@ -114,9 +114,7 @@ Propose the result as a tree before touching anything:
 On yes (or after their edits), say "Porting now." and run `vern stash SRC SHELF` for each
 row (`--working` for rows going to working). It keeps the name, never overwrites, and
 refuses tracked paths; pass `--tracked` only for files the human approved, whose deletion
-then shows in `git status` for them to commit. If it refuses, stop and ask. A `vern` without
-`stash` (before v0.2.0): `mkdir -p` the shelf, `mv` without overwriting, and record the
-reverse `mv` yourself.
+then shows in `git status` for them to commit. If it refuses, stop and ask.
 
 Then write or update the shelf index, `$(vern path apparatus)/README.md`, so a cold agent
 knows what each shelf holds before opening it. Keep an existing index's wording; add rows
