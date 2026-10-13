@@ -38,6 +38,13 @@ installed once per machine into each harness's user skill directory. It tells an
 there instead of into the repository, and ask before running `vern init` where there is no
 workspace yet. Nothing is added to any repository or to your instruction files.
 
+Asked to set up Vernacular, the skill follows [`references/adopt.md`](skills/vernacular/references/adopt.md):
+for a new project, `vern init` before anything is generated; for an existing one, an inventory of
+ignored and untracked material that the human assigns item by item before anything moves. Both end
+with [`scripts/check.sh`](skills/vernacular/scripts/check.sh), which proves the attachment survives
+`git clean -xfd`, a moved repository, a worktree, a reclone, and a lost `~/.vern`, all on a throwaway
+clone.
+
 ```sh
 npx skills add grosspoetrysystems/vernacular -g   # detects installed agents, links the skill
 ```

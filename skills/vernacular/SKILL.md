@@ -1,6 +1,6 @@
 ---
 name: vernacular
-description: Use whenever work produces or needs material that supports building a project but is not part of it — research, competitor analysis, plans, design notes, decisions, experiments, benchmarks, evals, scratch pads, side quests, agent reports, handoffs, build or meta infrastructure — and at the start of work in a Git repository, before planning or reporting on project status or direction. Finds and uses the project's private Vernacular workspace outside the repository so this material is kept, findable, and never committed.
+description: Use whenever work produces or needs material that supports building a project but is not part of it — research, competitor analysis, plans, design notes, decisions, experiments, benchmarks, evals, scratch pads, side quests, agent reports, handoffs, build or meta infrastructure — at the start of work in a Git repository, before planning or reporting on project status or direction, and when setting up or adopting Vernacular in a new or existing repository. Finds and uses the project's private Vernacular workspace outside the repository so this material is kept, findable, and never committed.
 ---
 
 # Vernacular workspace
@@ -45,6 +45,13 @@ Only act when you are about to write material that is not part of the project.
 2. Otherwise ask: "No Vernacular workspace here. Run `vern init`?"
 3. Proceed only on yes. Until then, keep the material in the conversation; do not
    write it into the repository.
+
+## Setting up
+
+When the human asks to set up or adopt Vernacular, is bootstrapping a new project, or the
+tree already holds plans, reports, research, or self-ignored scratch directories, follow
+`references/adopt.md` in this skill's directory. It inventories, asks, moves only what the
+human assigns, and ends with `scripts/check.sh`.
 
 ## Rules
 

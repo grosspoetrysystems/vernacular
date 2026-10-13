@@ -35,9 +35,7 @@ archives:
       - src: LICENSE
       - src: README.md
       # The agent skill ships with the binary; see README "Agents".
-      - src: skills/vernacular/SKILL.md
-        dst: skills/vernacular
-        strip_parent: true
+      - src: skills/**/*
 
 checksum:
   name_template: checksums.txt
