@@ -4,7 +4,7 @@ Vernacular's contribution policy is adapted from [Helicopter](https://github.com
 
 ## Activate the repository
 
-- [ ] Configure the DCO sign-off check.
+- [x] Configure the DCO sign-off check: the [DCO app](https://github.com/apps/dco) is installed on the organization, and the configurator requires its `DCO` check.
 - [ ] Decide which bot or GitHub App identities, if any, may interact with the repository.
 - [ ] Review the two-PR limit and issue-first categories in `CONTRIBUTING.md`.
 - [ ] Create or replace the `needs-triage` and `automation-review` labels used by the issue forms.
@@ -18,7 +18,7 @@ Run `python3 scripts/configure_repository.py MODE --repo grosspoetrysystems/vern
 
 All modes:
 
-- require `test-validator`, `validate-metadata`, and `check`;
+- require `test-validator`, `validate-metadata`, `check`, and `DCO`;
 - require resolved review conversations;
 - block force pushes and branch deletion; and
 - retain administrator bypass for emergency recovery.

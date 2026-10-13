@@ -258,7 +258,7 @@ class ConfigureRepositoryTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     settings["required_status_checks"],
-                    {"strict": True, "contexts": ["test-validator", "validate-metadata", "check"]},
+                    {"strict": True, "contexts": ["test-validator", "validate-metadata", "check", "DCO"]},
                 )
                 self.assertFalse(settings["enforce_admins"])
                 self.assertFalse(settings["allow_force_pushes"])
