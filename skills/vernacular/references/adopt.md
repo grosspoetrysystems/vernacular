@@ -111,9 +111,10 @@ Propose the result as a tree before touching anything:
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
 
-On yes (or after their edits), say "Porting now." and, for each row, `mkdir -p` the shelf and `mv` the source into
-it. Never overwrite: if a destination exists, stop and ask. Tracked files move only with
-explicit approval, and the deletion then shows in `git status` for the human to commit.
+On yes (or after their edits), say "Porting now." and run `vern stash SRC SHELF` for each
+row (`--working` for rows going to working). It keeps the name, never overwrites, and
+refuses tracked paths; pass `--tracked` only for files the human approved, whose deletion
+then shows in `git status` for them to commit. If it refuses, stop and ask.
 
 Then write or update the shelf index, `$(vern path apparatus)/README.md`, so a cold agent
 knows what each shelf holds before opening it. Keep an existing index's wording; add rows
@@ -124,11 +125,11 @@ for new shelves only:
     | benchmarks/ | Benchmark runs and the harness to replay them | Rerun before citing; old numbers are not current |
 
 Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
-fix, and an undo block that reverses every move, with literal absolute paths so it can be
-pasted as is:
+fix, and an undo block made of the `Undo:` lines `vern stash` printed, which reverse every
+move and can be pasted as is:
 
 ```sh
-mkdir -p "/Users/me/code/foo" && mv "/Users/me/.vern/data/vrn_7f29c1a0/apparatus/plans/PLAN.md" "/Users/me/code/foo/PLAN.md"
+mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/plans/PLAN.md' '/Users/me/code/foo/PLAN.md'
 ```
 
 Leave ignore rules alone, even ones that matched only what moved: a rule like `/notes` may
@@ -143,8 +144,8 @@ Then tell the human, in a few short lines, and go back to the original task. For
 
 > Ported benchmarks, ADRs, and planning docs into your workspace. `git status` is clean;
 > `vern status` shows where they went, and agents read them before planning.
-> To port anything else later, just ask, or from a terminal:
-> `mv PATH "$(vern path apparatus)/"`. Undo is in `adoption-YYYY-MM-DD.md`.
+> To port anything else later, just ask, or from a terminal: `vern stash PATH SHELF`.
+> Undo is in `adoption-YYYY-MM-DD.md`.
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
 
@@ -163,6 +164,7 @@ Working is scratch and makes no promise of order. When the human asks to tidy it
 > Working has 30 loose files: agent reports, probe logs, a few drafts. Want me to sort
 > them? Drafts worth keeping go to apparatus shelves; the rest onto shelves in working.
 
-Same rules as adoption: a pick list by kind, a preview tree, `mv` only, no renames, no
-deletion, an undo block in the record. Nothing is thrown away; clearing working out stays
-the human's call.
+Same rules as adoption: a pick list by kind, a preview tree, no renames, no deletion, an
+undo block in the record. Moves inside the workspace use plain `mv` (`vern stash` only takes
+material out of the repository). Nothing is thrown away; clearing working out stays the
+human's call.
