@@ -1,7 +1,9 @@
 #!/bin/sh
-# Legibility and durability checks for a repository attached to a Vernacular workspace.
-# Run from inside the attached checkout. The checkout itself is only read; every
-# destructive step (git clean, move, worktree, lost ~/.vern) runs on a throwaway clone.
+# Checks for a repository attached to a Vernacular workspace. Run from inside the checkout.
+#   check.sh             legibility only: reads, takes about a second
+#   check.sh --durable   also proves the attachment survives a reclone, git clean -xfd, a moved
+#                        repository, a worktree, and a lost ~/.vern, on a throwaway clone (copies
+#                        the repository; the checkout itself is only read)
 # Exit status is the number of failed checks.
 # ponytail: POSIX sh for macOS and Linux; Windows needs WSL or Git Bash.
 
@@ -37,6 +39,11 @@ if (cd "$canon" && vern status) | grep -q "$id"; then ok "vern status names $id"
 if [ "$(cd "$canon" && vern path canon)" = "$canon" ]; then ok "vern path canon is this checkout"; else fail "vern path canon is this checkout"; fi
 if seen; then ok "vern attach lists $id with this checkout"; else fail "vern attach lists $id with this checkout"; fi
 if grep -q "^id: $id\$" "$root/vernacular.yml"; then ok "manifest names its own id"; else fail "manifest names its own id"; fi
+
+if [ "${1:-}" != --durable ]; then
+  echo "$fails failed"
+  exit "$fails"
+fi
 
 echo "Durable (on a throwaway clone)"
 tmp=$(mktemp -d)

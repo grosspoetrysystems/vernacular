@@ -1,113 +1,140 @@
 # Adopting Vernacular
 
-Two flows: a new project, and an existing project that already has private material in
-its tree. Both end with the same checks.
+Everyone keeps working material differently: a folder with any name, files at the root, a
+notes folder elsewhere, an app, or nowhere. Adoption meets it where it is, takes a few
+questions, and ends with the human back at work: the repository clean and ready to share,
+their material findable by agents, nothing lost.
 
-## When to use
+## Tone
 
-- The human asks to set up, adopt, or start using Vernacular in a repository.
-- A new project is being bootstrapped (`git init`, rack-mount-go, Helicopter, or similar)
-  and its plans, reports, and research should stay out of the first commit.
-- An existing repository holds working material in its tree: self-ignored directories
-  (a `.gitignore` containing `*`), ignored scratch directories, untracked plans or reports.
-
-## When not to use
-
-- The repository is already attached and the human did not ask for an inventory: use the
-  main skill instead.
-- Governed material: secrets, credentials, customer or regulated data. It belongs in a
-  proper system, not apparatus. Say so and leave it in place.
+- Short. One question at a time; a "no" ends adoption immediately.
+- Describe what you see in the human's terms ("benchmarks, ADRs, planning docs"), never
+  Vernacular's.
+- Show before you move. Nothing moves, regroups, or changes without a yes.
+- No lecture about spaces, canon, or the PRD. The result is the explanation.
 
 ## What this never does
 
-- No commits, no staging, no deletion.
-- No edits to tracked files, and no moving tracked files, without the human's approval.
-- No classifying or moving anything the human has not decided on.
-- No changes to the repository beyond `vern init`'s one line of local Git config.
+- Commit, stage, or delete anything.
+- Rename or edit the human's files. Shelving changes folders, never file names or contents.
+- Move tracked files, or edit tracked files, without explicit approval for each one.
+- Touch dependencies, build output, caches, or tool and harness state (`node_modules`,
+  `dist`, `bin`, `target`, `coverage`, `.venv`, `.omp/`, `.claude/`, `.wrangler/`, …).
+- Handle governed material (secrets, credentials, customer or regulated data): say it
+  belongs in a proper system and leave it in place.
 
-## From scratch
+## 1. Attach
 
-1. `git init` if there is no repository yet.
-2. `vern init` before any bootstrap tool or agent generates material, so the first commit
-   never sees it. `vern init` works before the first commit.
-3. Run the bootstrap. Plans, research, and reports it produces go to `vern path working`
-   (or `vern path apparatus` if worth keeping), not the tree.
-4. Ask whether to add the optional snippet that `vern init` printed to `AGENTS.md`. Default
-   no: it is a committed trace, and the skill already does its job on this machine.
-5. Before the first commit, `git status --short` must list only project files.
-6. Run the checks below.
+If `git config --get vernacular.workspace` is empty: `vern init` (after the human's yes from
+the main skill), or `vern attach ID` if `vern attach` lists a workspace last seen with
+another checkout of this repository.
 
-## Existing project
+New project: run `vern init` before any bootstrap tool or agent generates material, so the
+first commit never sees it. It works before the first commit. Then skip to step 5.
 
-### 1. Inventory (read-only)
-
-From the repository root:
+## 2. Look (read-only, seconds)
 
     git status --short --ignored        # ?? untracked, !! ignored
-    git ls-files '*.md' | grep -v /     # tracked root-level Markdown
 
-For each untracked or ignored entry, and each tracked root-level file that is not a standard
-project file (README, LICENSE, CHANGELOG, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT,
-MAINTAINERS, AGENTS, CLAUDE), collect:
+Peek inside each untracked or ignored entry that is not on the never-touch list: file
+names, extensions, a few headings, sizes (`du -sh`). Enough to describe it, not to audit it.
+Tracked files that read as working material (a committed `PLAN.md`, `REPORT.md`, notes
+folder) can be offered too, marked as tracked: moving them is a project change.
 
-- **Tracked or not**: the `git status` marker, or `git ls-files --error-unmatch PATH`.
-- **Ignore rule**: `git check-ignore -v PATH` names the file and line of the rule. For a
-  directory, ask about a file inside it: `git check-ignore -v "$(find PATH -type f | head -1)"`.
-  A directory that ignores itself (its own `.gitignore` holds `*`) only shows up this way.
-- **Size**: `du -sh PATH`.
-- **Last modified**: `find PATH -type f -exec ls -lt {} + | head -1`.
-- **Referenced by**: `git grep -n -F 'PATH'`, the tracked files that break if it moves.
+Cross-reference the ignore rules. They are where people already said "this is mine, keep it
+out", whatever they named it:
 
-Skip descending into dependency and build directories (`node_modules`, `dist`, `bin`,
-`target`, `coverage`, `.venv`); report their size only.
+    cat .git/info/exclude                               # personal, never committed
+    git config --get core.excludesFile                  # global; default ~/.config/git/ignore
+    git ls-files '.gitignore' '*/.gitignore'            # the project's own rules
+    git check-ignore -v PATH                            # which rule hides PATH
 
-Show one table: path, tracked, ignore rule, size, last modified, referenced by, and a
-proposal: **leave**, **apparatus**, **working**, or **canon**. Propose **leave** for
-dependencies, build output, caches, and tool or harness state (`.omp/`, `.claude/`,
-`.wrangler/`, …). The proposal is a suggestion; the human decides every row.
+- A rule in `.git/info/exclude` or the global file (`notes/`, `scratch/`, `*.local.md`) is
+  a strong sign of personal material.
+- A rule in the tracked `.gitignore` (`/bench-output`) means the project already
+  acknowledges the path; tools or docs may depend on it.
+- A directory that hides itself (its own `.gitignore` holds `*`) shows as `!!` in
+  `git status --ignored`, but `git check-ignore` on the directory says not ignored; ask about
+  a file inside it instead.
+- A rule that matches nothing today is history, not material; mention it only at the end.
 
-### 2. Decide
+Note anything tracked files refer to: `git grep -n -F 'NAME'`. Moving it would break those
+references.
 
-Ask the human to assign each row. Point out rows that tracked files reference: moving them
-breaks those references until the human fixes them. Proceed only with rows the human
-assigned; everything else stays where it is.
+## 3. Offer
 
-### 3. Attach
+Describe what you found by kind, with rough counts and sizes, and let the human pick which
+kinds to move and shelve. Whatever they leave unpicked stays exactly where it is.
 
-If `git config --get vernacular.workspace` is empty, `vern init`. If `vern attach` lists a
-workspace last seen with another checkout of this repository, offer `vern attach ID`
-instead.
+> I see benchmarks (40 runs, 1.2 GB), ADRs (6), planning docs (3), and competitor analysis
+> notes (2). Which should I move into your Vernacular workspace and organize into shelves?
+>
+> - [ ] Benchmarks — `.substrate/bench/`
+> - [ ] ADRs — `.substrate/adr/`
+> - [ ] Planning docs — `PLAN.md`, `ROADMAP-draft.md`
+> - [ ] Competitor analysis — `notes/competitor-*.md`
 
-### 4. Move
+If your harness has a multi-select question tool (a checkbox list toggled with the space
+bar), use it: one option per kind, labelled with the kind and its count, the paths in the
+description, plus "None, not now". Otherwise print the numbered list and ask which numbers
+to move. One kind per option, never one option per file; split a kind only if the human
+asks.
 
-- **apparatus / working**: `mv PATH "$(vern path apparatus)/"` (or `working`). Keep the
-  name. If the destination exists, stop and ask; never overwrite.
-- **Tracked file to apparatus or working**: only with explicit approval for that file. Same
-  `mv`; the deletion then shows in `git status` for the human to commit.
-- **canon**: untracked material that belongs in the project stays where it is for the human
-  to stage. Material already in the workspace enters canon only through
-  `vern promote SRC DEST`.
-- Leave references in tracked files alone; list them for the human.
+If nothing turned up, ask once: "Do you already keep notes for this project anywhere — a
+folder somewhere else, an app?"
 
-### 5. Record
+| Answer | Do |
+|---|---|
+| None / not now | Stop. Back to the task. |
+| Some kinds picked | Step 4, with only those kinds. |
+| A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
+| An app or a notepad | Write `$(vern path apparatus)/README.md` with one line per place: what lives there and how to reach it. Offer to paste anything they want kept as files. |
 
-Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: each row with its decision, where it
-went, and the tracked references left to fix. This is how the workspace stays legible about
-what came from the tree.
+## 4. Shelve and move
 
-### 6. Verify the tree
+Propose the result as a tree before touching anything:
 
-`git status --short --ignored` again. Moved rows are gone; nothing else changed except
-approved deletions of tracked files.
+    apparatus/
+      benchmarks/      ← .substrate/bench/ (40 runs)
+      decisions/       ← .substrate/adr/
+      plans/           ← PLAN.md, ROADMAP-draft.md
+      research/
+        competitors/   ← notes/competitor-*.md
 
-## Checks
+- Shelves come from the material, not a fixed taxonomy; use the human's words where they
+  have them. File names never change.
+- Scratch, logs, and one-off output go to `vern path working` instead, said in the preview.
+- Flag anything tracked files reference; suggest leaving it unless the human wants to fix
+  the references.
 
-Run from inside the attached checkout:
+On yes (or after their edits): for each row, `mkdir -p` the shelf and `mv` the source into
+it. Never overwrite: if a destination exists, stop and ask. Tracked files move only with
+explicit approval, and the deletion then shows in `git status` for the human to commit.
 
-    sh "<this skill's directory>/scripts/check.sh"
+Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
+fix, and an undo block that reverses every move:
 
-It reads the checkout and runs every destructive step (`git clean -xfd`, moving the
-repository, a worktree, a lost `~/.vern`) on a throwaway clone, then restores the workspace's
-last-seen path. Report its output verbatim. Exit status is the number of failures; on any
-failure, stop and report rather than working around it. Friction that needs a change to
-`vern` is a ticket, not a workaround.
+```sh
+mv "$APPARATUS/plans/PLAN.md" "$CANON/PLAN.md"
+```
+
+Ignore rules that only existed to hide what moved now match nothing. Offer to remove those
+in `.git/info/exclude` (local, leaves no trace). List those in the tracked `.gitignore` for
+the human: editing it is a project change, so leave it unless they ask.
+
+## 5. Finish
+
+    sh "<this skill's directory>/scripts/check.sh"     # fast; reads only
+
+Then tell the human, in three lines, and go back to the original task:
+
+- `git status` — the repository is clean (or: only the tracked deletions you approved).
+- `vern status` — your material is here; agents read it before planning.
+- Undo: the block in `adoption-YYYY-MM-DD.md`.
+
+Report `check.sh` output only if something failed. Friction that needs a change to `vern`
+is a ticket, not a workaround.
+
+`check.sh --durable` additionally proves the attachment survives a reclone,
+`git clean -xfd`, a moved repository, a worktree, and a lost `~/.vern`, on a throwaway
+clone. It copies the repository, so offer it rather than running it by default.

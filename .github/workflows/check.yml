@@ -42,4 +42,4 @@ jobs:
           repo="$RUNNER_TEMP/repo"
           git init -q "$repo"
           git -C "$repo" -c user.name=ci -c user.email=ci@example.invalid commit -q --allow-empty -m init
-          (cd "$repo" && vern init >/dev/null && sh "$GITHUB_WORKSPACE/skills/vernacular/scripts/check.sh")
+          (cd "$repo" && vern init >/dev/null && sh "$GITHUB_WORKSPACE/skills/vernacular/scripts/check.sh" --durable)

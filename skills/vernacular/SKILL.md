@@ -45,13 +45,14 @@ Only act when you are about to write material that is not part of the project.
 2. Otherwise ask: "No Vernacular workspace here. Run `vern init`?"
 3. Proceed only on yes. Until then, keep the material in the conversation; do not
    write it into the repository.
+4. After `vern init`, offer to bring in what the human already keeps (steps 2–5 of
+   `references/adopt.md`), then go straight back to the task.
 
 ## Setting up
 
-When the human asks to set up or adopt Vernacular, is bootstrapping a new project, or the
-tree already holds plans, reports, research, or self-ignored scratch directories, follow
-`references/adopt.md` in this skill's directory. It inventories, asks, moves only what the
-human assigns, and ends with `scripts/check.sh`.
+When the human asks to set up or adopt Vernacular, is bootstrapping a new project, or right
+after `vern init`, follow `references/adopt.md` in this skill's directory: look, offer the
+kinds of material found as a pick list, shelve only what was picked, finish in three lines.
 
 ## Rules
 
