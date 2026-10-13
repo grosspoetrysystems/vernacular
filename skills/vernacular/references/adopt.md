@@ -95,17 +95,18 @@ folder somewhere else, an app?"
 Propose the result as a tree before touching anything:
 
     apparatus/
-      benchmarks/      ← .substrate/bench/ (40 runs)
-      decisions/       ← .substrate/adr/
-      plans/           ← PLAN.md, ROADMAP-draft.md
+      bench/           ← .substrate/bench/       (already a shelf: name kept)
+      adr/             ← .substrate/adr/         (already a shelf: name kept)
+      plans/           ← PLAN.md, ROADMAP-draft.md         (loose files: new shelf)
       research/
-        competitors/   ← notes/competitor-*.md
+        competitors/   ← notes/competitor-*.md             (loose files: new shelf)
 
 - Shelves come from the material, not a fixed taxonomy; use the human's words where they
   have them. Add a shelf when material needs one, not to fill a set. File names never change.
-- Material that is already organized keeps its organization: a folder of shelves moves
-  shelf by shelf as it is, and cohesive trees (a benchmark run, an artifact set, a spike)
-  move intact. Propose regrouping only for loose files.
+- Existing organization outranks a tidier layout. A folder that is already shelved keeps its
+  shelf names and moves shelf by shelf as it is; if it has its own README or index, keep it
+  and its relative links working. Cohesive trees (a benchmark run, an artifact set, a spike)
+  move intact. Propose new shelves only for loose files.
 - Scratch, logs, and one-off output go to `vern path working` instead, said in the preview.
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
