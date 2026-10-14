@@ -61,6 +61,13 @@ out", whatever they named it:
 Note anything tracked files refer to: `git grep -n -F 'NAME'`. Moving it would break those
 references.
 
+Scan for conventions that would send material back into the tree after adoption: instruction
+and skill files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/`,
+`.github/copilot-instructions.md`, `CONTRIBUTING.md`, any `SKILL.md`, tracked or not) and tool
+configs that tell agents or tools where to write plans, reports, research, scratch, or
+benchmark output. `git grep -n -i -E 'NAME|scratch|reports?/|plans?/|research/' -- PATHS`
+finds most of them. Collect them; they are flagged at the end, not acted on.
+
 ## 3. Offer
 
 Describe what you found by kind, with rough counts and sizes, show where it would go, and
@@ -168,12 +175,16 @@ Then tell the human, in a few short lines, and go back to the original task. For
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
 
-If tracked files still point at the old location (a CONTRIBUTING section, a skill, a README
-link), an agent following them would recreate the folder. Ask once, in the same message,
-recommended answer first: "Point them at the workspace? (`CONTRIBUTING.md:68-85`,
-`skills/internal-docs/SKILL.md`; tracked, so the edit waits in `git status` for you)". On yes,
-replace the old path with `$(vern path apparatus)` or "the Vernacular workspace" — never with
-an absolute path, which is machine-specific.
+Flag, in the same message, every convention from step 2 that would route material back into
+the tree, one line each with where it lives and what it says, for example:
+
+> Heads up: `CONTRIBUTING.md:68-85` and `skills/internal-docs/SKILL.md` still tell agents to
+> write research under `.substrate/`. Following them would recreate it. Point them at the
+> workspace when you're ready; `CONTRIBUTING.md` is tracked, so that's a project change.
+
+Don't edit them and don't ask a question about them: they are the human's conventions, and
+the flag is enough. If asked to fix them, refer to "the Vernacular workspace" or
+`$(vern path apparatus)`, never an absolute path, which is machine-specific.
 
 Report `check.sh` output only if something failed. Friction that needs a change to `vern`
 is a ticket, not a workaround.
