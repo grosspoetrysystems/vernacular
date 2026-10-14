@@ -34,12 +34,11 @@ install it yourself.
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
-5. Asked to port something from the repository into the workspace: unless the human
-   already said keep or scratch, ask once, recommended answer first: "Keep it (apparatus)
-   or scratch (working)?" Scratch is `vern stash PATH`; keep is
+5. Asked to port something from the repository into the workspace: `vern stash PATH`
+   puts it in working, the default for anything new. If the human says to keep it, use
    `vern stash --apparatus PATH [SHELF]` onto the shelf that matches its kind —
-   `ls "$(vern path apparatus)"`, or propose a new shelf if none fits. Say the move in one
-   line first ("`notes/` → apparatus `research/`"). It keeps the name inside SHELF, never
+   `ls "$(vern path apparatus)"`, or propose a new shelf if none fits. Don't ask which; say
+   the move in one line ("`notes/` → working"). It keeps the name inside SHELF, never
    overwrites, and refuses tracked paths; add `--tracked` only after the human approves.
 6. Asked to tidy working, or it has become a pile: offer once to sort it onto shelves
    ("Tidying working" in `references/adopt.md`).

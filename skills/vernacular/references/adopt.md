@@ -64,30 +64,26 @@ references.
 ## 3. Offer
 
 Describe what you found by kind, with rough counts and sizes, show where it would go, and
-make the recommended answer the one Enter accepts. Where it goes is the human's call, not
-yours: the two destinations are options, named in plain words. Ask one single-choice
-question with the preview in the question text, so one keypress settles it:
+make the recommended answer the one Enter accepts. Migrated material goes to apparatus:
+the human kept it this long, so it is worth keeping. Say so in the question, in plain
+words, with the preview in the question text, so one keypress settles it:
 
 > I see benchmarks (40 runs, 1.2 GB), ADRs (6), planning docs (3), and competitor analysis
-> notes (2). I'd move them out of the repo, keeping their folder names:
+> notes (2). I'd move them out of the repo into your workspace's kept material
+> (apparatus), keeping their folder names:
 >
 >     bench/ ← .substrate/bench/   adr/ ← .substrate/adr/
 >     plans/ ← PLAN.md, ROADMAP-draft.md   research/competitors/ ← notes/competitor-*.md
 >
-> 1. Keep it — apparatus, read by agents before planning (recommended)
-> 2. Scratch — working, no promise to keep
-> 3. Let me choose
-> 4. Not now
+> 1. Move all of it (recommended)
+> 2. Let me choose
+> 3. Not now
 
-- Recommend **Keep** when the material is curated (an index, ADRs, research, a harness) and
-  **Scratch** when it is logs, output, and drafts; put the recommended one first so Enter
-  accepts it. Never move into apparatus without the human having picked Keep.
-- **Let me choose**: a multi-select with one option per kind, labelled with the kind, its
-  count, and its suggested destination ("Research (10) → keep"), paths in the description,
-  **every kind preselected**. The human unchecks what stays, and can say which kinds go to
-  the other destination. If the harness's multi-select cannot preselect, ask the inverse
-  instead: "Leave any of these where they are?", where selecting nothing moves them all. One
-  kind per option, never one per file.
+- **Let me choose**: a multi-select with one option per kind, labelled with the kind and its
+  count, paths in the description, **every kind preselected**. The human unchecks what stays.
+  If the harness's multi-select cannot preselect, ask the inverse instead: "Leave any of
+  these where they are?", where selecting nothing moves them all. One kind per option, never
+  one per file. If the human says a kind is scratch, it goes to working instead.
 - An empty or cancelled answer is never a silent "no": say "Nothing moved. Say the word if
   you want to port any of it later." and return to the task.
 - Leave kinds you would not recommend moving (answer keys an evaluated agent must not read,
@@ -125,8 +121,8 @@ picks changed it, and then as the last question before moving:
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
 
-Once accepted, say "Porting now." and run `vern stash --apparatus SRC [SHELF]` for rows the
-human chose to keep, `vern stash SRC [SHELF]` for scratch rows. `stash` keeps SRC's name
+Once accepted, say "Porting now." and run `vern stash --apparatus SRC [SHELF]` for each row,
+or `vern stash SRC [SHELF]` for kinds the human called scratch. `stash` keeps SRC's name
 inside SHELF: omit SHELF when SRC is already a shelf (`vern stash --apparatus
 .substrate/research` → `apparatus/research/`), and pass it only to group loose files
 (`vern stash --apparatus PLAN.md plans` → `apparatus/plans/PLAN.md`). It never overwrites
