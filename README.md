@@ -110,8 +110,9 @@ name. It never overwrites, refuses tracked paths unless `--tracked` is given, an
 Apparatus is its own Git repository, separate from the project's, so kept material can always
 be recovered: `vern init` creates it (and adds it to existing workspaces), `vern stash
 --apparatus` commits each move with the project commit it came from, and `vern status` shows
-changes not yet recorded. It works without any Git setup: the repository's local config turns
-commit signing off and supplies an identity if you have none. It is local; nothing is pushed.
+changes not yet recorded. vern's own commits work without any Git setup: they skip signing and
+use a `vern` identity if you have none, without changing the repository's config. It is local;
+nothing is pushed.
 Working has no history, by design: it is scratch. An apparatus path you point somewhere else
 (a notes folder, a shared clone) is left for you to version.
 

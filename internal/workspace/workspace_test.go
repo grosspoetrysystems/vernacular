@@ -400,8 +400,11 @@ func TestApparatusHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 		mustInit(t, repo)
-		if files := run(t, ws.Apparatus, "ls-files"); files != "research/notes/idea.md" {
-			t.Errorf("first commit holds %q", files)
+		if got := run(t, ws.Apparatus, "log", "--format=%s", "--name-only"); got != "Start apparatus history\n\nresearch/notes/idea.md" {
+			t.Errorf("history after migration = %q", got)
+		}
+		if cfg, err := exec.Command("git", "-C", ws.Apparatus, "config", "--local", "--list").Output(); err != nil || strings.Contains(string(cfg), "gpgsign") || strings.Contains(string(cfg), "user.") {
+			t.Errorf("vern changed the apparatus repository's config:\n%s", cfg)
 		}
 		if n, ok := ws.Unrecorded(); !ok || n != 0 {
 			t.Errorf("unrecorded = %d, %v", n, ok)
