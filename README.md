@@ -105,6 +105,17 @@ folder) in working, or in apparatus with `--apparatus` for material worth keepin
 name. It never overwrites, refuses tracked paths unless `--tracked` is given, and prints the
 `mv` that undoes it.
 
+## History
+
+Apparatus is its own Git repository, separate from the project's, so kept material can always
+be recovered: `vern init` creates it (and adds it to existing workspaces), `vern stash
+--apparatus` commits each move with the project commit it came from, and `vern status` shows
+changes not yet recorded. vern's own commits work without any Git setup: they skip signing and
+use a `vern` identity if you have none, without changing the repository's config. It is local;
+nothing is pushed.
+Working has no history, by design: it is scratch. An apparatus path you point somewhere else
+(a notes folder, a shared clone) is left for you to version.
+
 ## Attachment
 
 `vern init` stores an opaque ID in the repository's local Git config (`vernacular.workspace`)

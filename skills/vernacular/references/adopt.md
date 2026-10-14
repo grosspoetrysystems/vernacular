@@ -158,9 +158,10 @@ mkdir '/Users/me/code/foo/.substrate' && printf '*\n' > '/Users/me/code/foo/.sub
 mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/research' '/Users/me/code/foo/.substrate/research'
 ```
 
-Leave ignore rules alone, even ones that matched only what moved: a rule like `/notes` may
-be there for future material, and editing the tracked `.gitignore` is a project change. List
-them in the record; edit one only if the human asks.
+Leave the project's ignore rules alone, even ones that matched only what moved: a rule like
+`/notes` in the tracked `.gitignore` may be there for future material, and editing it is a
+project change. List them in the record; edit one only if the human asks. A self-ignoring
+folder's own `.gitignore` is not a project rule: it goes with the emptied folder (above).
 
 ## 5. Finish
 
