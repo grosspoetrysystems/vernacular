@@ -101,7 +101,7 @@ folder somewhere else, an app?"
 
 | Answer | Do |
 |---|---|
-| Not now / nothing picked | Stop. Back to the task. |
+| Not now / nothing picked / keeps nothing | Write one line to `$(vern path working)/adoption-YYYY-MM-DD.md` (what was offered, the answer) so the offer is not repeated. Back to the task. |
 | Move all, or some kinds picked | Step 4, with those kinds. |
 | A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
 | An app or a notepad | Add an *Elsewhere* section to `$(vern path apparatus)/README.md`: one line per place, what lives there and how to reach it. Offer to paste anything they want kept as files. |

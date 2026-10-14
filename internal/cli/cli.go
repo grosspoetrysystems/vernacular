@@ -164,6 +164,7 @@ func runInit(args []string, stdout io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stdout, "Created workspace %s at %s\n", ws.ID(), workspace.Abbrev(ws.Root))
 	printSpaces(stdout, ws)
+	_, _ = fmt.Fprintf(stdout, "\nNext: ask your agent to \"set up Vernacular\". It offers to move notes, plans, and\nresearch you already keep in this repository into the workspace.\n")
 	_, _ = fmt.Fprintf(stdout, "\nOptional: add this to the repository's AGENTS.md (or CLAUDE.md):\n\n%s", agentSnippet)
 	return nil
 }
