@@ -100,7 +100,9 @@ describe themselves to agents without the skill.
 commits; it refuses destinations the repository ignores, and refuses files that look like
 secrets or local paths unless `--allow-findings` is given.
 
-`vern stash` is the opposite: it moves a path out of the repository onto a shelf (a top-level
+Once agents write to the workspace, little lands in the repository by mistake; `vern stash` is
+for what does — an adoption, a misfire, a note that became worth keeping but not publishing.
+It is the opposite of promote: it moves a path out of the repository onto a shelf (a top-level
 folder) in working, or in apparatus with `--apparatus` for material worth keeping, keeping its
 name. It never overwrites and refuses tracked paths unless `--tracked` is given. Each stash gets
 an ID and a line in the workspace's `stash.jsonl`, a journal of what left the repository;

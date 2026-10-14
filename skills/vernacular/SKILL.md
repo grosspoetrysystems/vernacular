@@ -37,12 +37,15 @@ install it yourself.
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
-5. Asked to port something from the repository into the workspace: `vern stash PATH`
-   puts it in working, the default for anything new. If the human says to keep it, use
+5. Step 3 means stashing is rare: it is for material that is in the repository anyway — a
+   write that missed the workspace, or something that became worth keeping but is not
+   public. Asked to port one, or catching your own misfire: `vern stash PATH` puts it in
+   working, the default for anything new. If the human says to keep it, use
    `vern stash --apparatus PATH [SHELF]` onto the shelf that matches its kind —
    `ls "$(vern path apparatus)"`, or propose a new shelf if none fits. Don't ask which; say
    the move in one line ("`notes/` → working"). It keeps the name inside SHELF, never
    overwrites, and refuses tracked paths; add `--tracked` only after the human approves.
+   A wrong stash comes back with `vern stash --undo` (the latest) or `--undo ID`.
 6. Asked to tidy working, or it has become a pile: offer once to sort it onto shelves
    ("Tidying working" in `references/adopt.md`).
 

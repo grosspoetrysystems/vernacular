@@ -152,6 +152,8 @@ func Unstash(dir, id string) (Stashed, error) {
 		i--
 	}
 	switch {
+	case len(entries) == 0:
+		return Stashed{}, errors.New("nothing to undo: no stash recorded for this workspace")
 	case i < 0 && id != "":
 		return Stashed{}, fmt.Errorf("no stash %s recorded for this workspace (see %s)", id, Display(logPath))
 	case i < 0:
