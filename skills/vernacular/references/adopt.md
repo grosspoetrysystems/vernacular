@@ -208,5 +208,6 @@ Working is scratch and makes no promise of order. When the human asks to tidy it
 
 Same rules as adoption: a pick list by kind, a preview tree, no renames, no deletion, an
 undo block in the record. Moves inside the workspace use plain `mv` (`vern stash` only takes
-material out of the repository). Nothing is thrown away; clearing working out stays the
-human's call.
+material out of the repository); a stash moved this way can no longer be undone with
+`vern stash --undo`, so the record's undo block covers it. Nothing is thrown away; clearing
+working out stays the human's call.

@@ -15,17 +15,19 @@ import (
 	"time"
 )
 
-// stashLog records every stash, oldest first, as one JSON object per line. Paths are relative to
-// canon and to the workspace directory, so entries survive either one moving.
+// stashLog is the workspace's append-only journal of stashes, oldest first, one JSON object per
+// line; an undo marks its entry rather than removing it. Paths are relative to canon and to the
+// workspace directory, so entries survive either one moving.
 const stashLog = "stash.jsonl"
 
 // StashEntry is one recorded stash.
 type StashEntry struct {
-	ID    string    `json:"id"`
-	At    time.Time `json:"at"`
-	Path  string    `json:"path"`            // where it was, relative to canon
-	To    string    `json:"to"`              // where it went, relative to the workspace directory
-	Canon string    `json:"canon,omitempty"` // canon's commit at the time
+	ID       string     `json:"id"`
+	At       time.Time  `json:"at"`
+	Path     string     `json:"path"`                // where it was, relative to canon
+	To       string     `json:"to"`                  // where it went, relative to the workspace directory
+	Canon    string     `json:"canon,omitempty"`     // canon's commit at the time
+	UndoneAt *time.Time `json:"undone_at,omitempty"` // set when vern stash --undo moved it back
 }
 
 // Stashed is the result of a stash or its undo. Warn is set when the move succeeded but
@@ -146,16 +148,16 @@ func Unstash(dir, id string) (Stashed, error) {
 		return Stashed{}, err
 	}
 	i := len(entries) - 1
-	if id != "" {
-		for i >= 0 && entries[i].ID != id {
-			i--
-		}
+	for i >= 0 && (id == "" && entries[i].UndoneAt != nil || id != "" && entries[i].ID != id) {
+		i--
 	}
-	if i < 0 {
-		if id != "" {
-			return Stashed{}, fmt.Errorf("no stash %s recorded for this workspace (see %s)", id, Display(logPath))
-		}
-		return Stashed{}, errors.New("nothing to undo: no stash recorded for this workspace")
+	switch {
+	case i < 0 && id != "":
+		return Stashed{}, fmt.Errorf("no stash %s recorded for this workspace (see %s)", id, Display(logPath))
+	case i < 0:
+		return Stashed{}, errors.New("nothing to undo: every recorded stash is already undone")
+	case entries[i].UndoneAt != nil:
+		return Stashed{}, fmt.Errorf("stash %s was already undone at %s", id, entries[i].UndoneAt.Format(time.RFC3339))
 	}
 	e := entries[i]
 	from, to := filepath.Join(ws.Root, filepath.FromSlash(e.To)), filepath.Join(ws.Canon, filepath.FromSlash(e.Path))
@@ -171,7 +173,9 @@ func Unstash(dir, id string) (Stashed, error) {
 	if err := os.Rename(from, to); err != nil {
 		return Stashed{}, err
 	}
-	out := Stashed{ID: e.ID, From: from, To: to, Warn: writeEntries(logPath, append(entries[:i:i], entries[i+1:]...))}
+	now := time.Now().UTC().Truncate(time.Second)
+	entries[i].UndoneAt = &now
+	out := Stashed{ID: e.ID, From: from, To: to, Warn: writeEntries(logPath, entries)}
 	if within(ws.Apparatus, from) && ws.versioned() {
 		kept, _ := filepath.Rel(ws.Apparatus, from)
 		out.Warn = errors.Join(out.Warn, ws.commit(kept, "Unstash "+e.Path+" ("+e.ID+")"+canonRef(ws.Canon)))

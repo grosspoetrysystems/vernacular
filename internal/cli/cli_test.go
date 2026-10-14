@@ -226,10 +226,18 @@ func TestStashUndoRestoresByDefaultAndByID(t *testing.T) {
 		t.Fatalf("undo did not restore the latest stash: %v", err)
 	}
 	if r := vern(t, "", "stash", "--undo"); r.code != 1 || !strings.Contains(r.errOut, "nothing to undo") {
-		t.Errorf("undo with nothing recorded: exit %d, %q", r.code, r.errOut)
+		t.Errorf("undo with everything undone: exit %d, %q", r.code, r.errOut)
 	}
-	if r := vern(t, "", "stash", "--undo", id); r.code != 1 || !strings.Contains(r.errOut, "no stash "+id) {
+	if r := vern(t, "", "stash", "--undo", id); r.code != 1 || !strings.Contains(r.errOut, "already undone") {
 		t.Errorf("undo of an undone ID: exit %d, %q", r.code, r.errOut)
+	}
+	if r := vern(t, "", "stash", "--undo", "st_nope"); r.code != 1 || !strings.Contains(r.errOut, "no stash st_nope") {
+		t.Errorf("undo of an unknown ID: exit %d, %q", r.code, r.errOut)
+	}
+	// The journal keeps both stashes, each marked undone.
+	journal, err := os.ReadFile(filepath.Join(filepath.Dir(mustRun(t, "path", "working")), "stash.jsonl"))
+	if err != nil || strings.Count(string(journal), "\n") != 2 || strings.Count(string(journal), `"undone_at"`) != 2 {
+		t.Errorf("journal after two undos:\n%s", journal)
 	}
 }
 

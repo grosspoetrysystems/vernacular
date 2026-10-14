@@ -103,8 +103,10 @@ secrets or local paths unless `--allow-findings` is given.
 `vern stash` is the opposite: it moves a path out of the repository onto a shelf (a top-level
 folder) in working, or in apparatus with `--apparatus` for material worth keeping, keeping its
 name. It never overwrites and refuses tracked paths unless `--tracked` is given. Each stash gets
-an ID, recorded in the workspace's `stash.jsonl`; `vern stash --undo` puts the latest one back
-(repeat it to go further back), and `vern stash --undo ID` puts back a specific one.
+an ID and a line in the workspace's `stash.jsonl`, a journal of what left the repository;
+`vern stash --undo` puts the latest one back (repeat it to go further back), and
+`vern stash --undo ID` puts back a specific one. An undo marks its line `undone_at` rather than
+deleting it.
 
 ## History
 
