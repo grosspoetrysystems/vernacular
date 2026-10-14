@@ -63,36 +63,45 @@ references.
 
 ## 3. Offer
 
-Describe what you found by kind, with rough counts and sizes, and let the human pick which
-kinds to move and shelve. Whatever they leave unpicked stays exactly where it is.
+Describe what you found by kind, with rough counts and sizes, show where it would go, and
+make the recommended answer the one Enter accepts. Ask one single-choice question; the
+preview goes in the question text, so one keypress moves everything:
 
 > I see benchmarks (40 runs, 1.2 GB), ADRs (6), planning docs (3), and competitor analysis
-> notes (2). Which should I move into your Vernacular workspace and organize into shelves?
+> notes (2). I'd move them into your Vernacular workspace like this:
 >
-> - [ ] Benchmarks — `.substrate/bench/`
-> - [ ] ADRs — `.substrate/adr/`
-> - [ ] Planning docs — `PLAN.md`, `ROADMAP-draft.md`
-> - [ ] Competitor analysis — `notes/competitor-*.md`
+>     apparatus/  bench/ ← .substrate/bench/   adr/ ← .substrate/adr/
+>                 plans/ ← PLAN.md, ROADMAP-draft.md   research/competitors/ ← notes/competitor-*.md
+>
+> 1. Move all of it (recommended)
+> 2. Let me choose
+> 3. Not now
 
-If your harness has a multi-select question tool (a checkbox list toggled with the space
-bar), use it: one option per kind, labelled with the kind and its count, the paths in the
-description, plus "None, not now". Otherwise print the numbered list and ask which numbers
-to move. One kind per option, never one option per file; split a kind only if the human
-asks.
+- Option 1 is first and is the default, so Enter moves everything shown.
+- **Let me choose**: a multi-select with one option per kind, labelled with the kind and its
+  count, paths in the description, **every kind preselected**. The human unchecks what stays.
+  If the harness's multi-select cannot preselect, ask the inverse instead: "Leave any of
+  these where they are?", where selecting nothing moves them all. One kind per option, never
+  one per file.
+- An empty or cancelled answer is never a silent "no": say "Nothing moved. Say the word if
+  you want to port any of it later." and return to the task.
+- Leave kinds you would not recommend moving (answer keys an evaluated agent must not read,
+  material product code depends on) out of the default and say why in one line.
 
 If nothing turned up, ask once: "Do you already keep notes for this project anywhere — a
 folder somewhere else, an app?"
 
 | Answer | Do |
 |---|---|
-| None / not now | Stop. Back to the task. |
-| Some kinds picked | Step 4, with only those kinds. |
+| Not now / nothing picked | Stop. Back to the task. |
+| Move all, or some kinds picked | Step 4, with those kinds. |
 | A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
 | An app or a notepad | Add an *Elsewhere* section to `$(vern path apparatus)/README.md`: one line per place, what lives there and how to reach it. Offer to paste anything they want kept as files. |
 
 ## 4. Shelve and move
 
-Propose the result as a tree before touching anything:
+The offer already showed where everything goes. Show the tree again only if the human's
+picks changed it, and then as the last question before moving:
 
     apparatus/
       bench/           ← .substrate/bench/       (already a shelf: name kept)
@@ -111,7 +120,7 @@ Propose the result as a tree before touching anything:
 - Flag anything tracked files reference; suggest leaving it unless the human wants to fix
   the references.
 
-On yes (or after their edits), say "Porting now." and run `vern stash --apparatus SRC SHELF`
+Once accepted, say "Porting now." and run `vern stash --apparatus SRC SHELF`
 for each apparatus row, `vern stash SRC [SHELF]` for rows going to working. It keeps the name, never overwrites, and
 refuses tracked paths; pass `--tracked` only for files the human approved, whose deletion
 then shows in `git status` for them to commit. If it refuses, stop and ask.
