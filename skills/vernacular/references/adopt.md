@@ -129,6 +129,11 @@ inside SHELF: omit SHELF when SRC is already a shelf (`vern stash --apparatus
 and refuses tracked paths; pass `--tracked` only for files the human approved, whose
 deletion then shows in `git status` for them to commit. If it refuses, stop and ask.
 
+A move is complete when nothing is left behind. A folder emptied by the move that holds only
+its own ignore file (a `.gitignore` containing `*`) or nothing at all is removed as part of the
+move, without another question: it was a hiding place, and the workspace replaces it. Leave a
+folder that still holds anything else, or whose ignore file has other rules.
+
 Then write or update the shelf index, `$(vern path apparatus)/README.md`, so a cold agent
 knows what each shelf holds before opening it. Keep an existing index's wording; add rows
 for new shelves only:
@@ -138,11 +143,12 @@ for new shelves only:
     | benchmarks/ | Benchmark runs and the harness to replay them | Rerun before citing; old numbers are not current |
 
 Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
-fix, and an undo block made of the `Undo:` lines `vern stash` printed, which reverse every
-move and can be pasted as is:
+fix, and an undo block made of the `Undo:` lines `vern stash` printed, preceded by recreating
+any folder that was removed, so it can be pasted as is and reverses every step:
 
 ```sh
-mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/plans/PLAN.md' '/Users/me/code/foo/PLAN.md'
+mkdir '/Users/me/code/foo/.substrate' && printf '*\n' > '/Users/me/code/foo/.substrate/.gitignore'
+mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/research' '/Users/me/code/foo/.substrate/research'
 ```
 
 Leave ignore rules alone, even ones that matched only what moved: a rule like `/notes` may
@@ -161,6 +167,13 @@ Then tell the human, in a few short lines, and go back to the original task. For
 > `vern stash --apparatus PATH` to keep it. Undo is in `adoption-YYYY-MM-DD.md`.
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
+
+If tracked files still point at the old location (a CONTRIBUTING section, a skill, a README
+link), an agent following them would recreate the folder. Ask once, in the same message,
+recommended answer first: "Point them at the workspace? (`CONTRIBUTING.md:68-85`,
+`skills/internal-docs/SKILL.md`; tracked, so the edit waits in `git status` for you)". On yes,
+replace the old path with `$(vern path apparatus)` or "the Vernacular workspace" — never with
+an absolute path, which is machine-specific.
 
 Report `check.sh` output only if something failed. Friction that needs a change to `vern`
 is a ticket, not a workaround.
