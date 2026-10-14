@@ -297,7 +297,7 @@ func runStatus(args []string, stdout io.Writer) error {
 		}
 		_, _ = fmt.Fprintf(stdout, "  %s, %s\n", plural(tr.Files, "file"), plural(tr.Dirs, "directory"))
 		if n, ok := ws.Unrecorded(); ok && n > 0 && s.name == "apparatus" {
-			_, _ = fmt.Fprintf(stdout, "  %s not in history yet: git -C %s add -A && git -C %s commit\n",
+			_, _ = fmt.Fprintf(stdout, "  %s not in history yet: git -C %s add -A && git -C %s commit -m \"…\"\n",
 				plural(n, "change"), shellQuote(ws.Apparatus), shellQuote(ws.Apparatus))
 		}
 		for _, it := range tr.Recent {
