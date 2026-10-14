@@ -295,10 +295,11 @@ func TestStash(t *testing.T) {
 	write(t, filepath.Join(unlinked, "notes.md"), "x\n")
 
 	t.Run("directory moves intact onto a nested shelf", func(t *testing.T) {
-		_, dst, err := Stash(filepath.Join(repo, ".substrate", "adr"), "research/old", true, false)
+		st, err := Stash(filepath.Join(repo, ".substrate", "adr"), "research/old", true, false)
 		if err != nil {
 			t.Fatal(err)
 		}
+		dst := st.To
 		if want := filepath.Join(ws.Apparatus, "research", "old", "adr"); dst != want {
 			t.Errorf("dst = %s, want %s", dst, want)
 		}
@@ -312,22 +313,22 @@ func TestStash(t *testing.T) {
 
 	t.Run("glob-like name is matched literally", func(t *testing.T) {
 		// As a pathspec, "a*.md" would match the tracked ab.md and refuse an untracked file.
-		if _, _, err := Stash(filepath.Join(repo, "a*.md"), "", false, false); err != nil {
+		if _, err := Stash(filepath.Join(repo, "a*.md"), "", false, false); err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("working by default, without a shelf", func(t *testing.T) {
-		if _, dst, err := Stash(filepath.Join(repo, "scratch.log"), "", false, false); err != nil || dst != filepath.Join(ws.Working, "scratch.log") {
-			t.Fatalf("dst %s, err %v", dst, err)
+		if st, err := Stash(filepath.Join(repo, "scratch.log"), "", false, false); err != nil || st.To != filepath.Join(ws.Working, "scratch.log") {
+			t.Fatalf("dst %s, err %v", st.To, err)
 		}
 	})
 
 	t.Run("tracked only with consent", func(t *testing.T) {
-		if _, _, err := Stash(filepath.Join(repo, "README.md"), "", false, false); err == nil || !strings.Contains(err.Error(), "tracked") {
+		if _, err := Stash(filepath.Join(repo, "README.md"), "", false, false); err == nil || !strings.Contains(err.Error(), "tracked") {
 			t.Fatalf("err = %v, want tracked refusal", err)
 		}
-		if _, _, err := Stash(filepath.Join(repo, "README.md"), "", false, true); err != nil {
+		if _, err := Stash(filepath.Join(repo, "README.md"), "", false, true); err != nil {
 			t.Fatal(err)
 		}
 		if st := run(t, repo, "status", "--short", "README.md"); st != "D README.md" {
@@ -341,14 +342,14 @@ func TestStash(t *testing.T) {
 		{"overwrite", filepath.Join(repo, "PLAN.md"), "plans", "never overwrites"},
 		{"repository root", repo, "", "repository root"},
 		{"inside .git", filepath.Join(repo, ".git", "config"), "", "not inside a Git work tree"},
-		{"already in the workspace", filepath.Join(ws.Apparatus, "plans", "PLAN.md"), "", "not inside a Git work tree"},
+		{"already in the workspace", filepath.Join(ws.Apparatus, "plans", "PLAN.md"), "", "already in the workspace"},
 		{"unattached repository", filepath.Join(unlinked, "notes.md"), "", "not attached"},
 		{"shelf escapes the space", filepath.Join(repo, "PLAN.md"), "../../elsewhere", "relative path inside"},
 		{"missing source", filepath.Join(repo, "nope.md"), "", "does not exist"},
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := Stash(tc.src, tc.shelf, true, false)
+			_, err := Stash(tc.src, tc.shelf, true, false)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("err = %v, want %q", err, tc.want)
 			}
@@ -357,6 +358,68 @@ func TestStash(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "PLAN.md")); err != nil {
 		t.Errorf("refused stash must leave the source: %v", err)
 	}
+}
+
+// Apparatus history must work for anyone: here the global config demands signing with a gpg
+// that always fails, and names no identity.
+func TestApparatusHistory(t *testing.T) {
+	home := isolate(t)
+	write(t, filepath.Join(filepath.Dir(home), ".gitconfig"), "[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n")
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	if got := run(t, ws.Apparatus, "rev-parse", "--show-toplevel"); got != ws.Apparatus {
+		t.Fatalf("apparatus is not its own repository: %s", got)
+	}
+
+	write(t, filepath.Join(repo, "notes", "idea.md"), "keep me\n")
+	st, err := Stash(filepath.Join(repo, "notes"), "research", true, false)
+	if err != nil || st.Commit != nil {
+		t.Fatalf("stash: %v, commit: %v", err, st.Commit)
+	}
+	sha := run(t, repo, "rev-parse", "--short", "HEAD")
+	if msg := run(t, ws.Apparatus, "log", "-1", "--format=%B"); msg != "Stash notes\n\nCanon: app "+sha {
+		t.Errorf("commit message = %q", msg)
+	}
+	if st := run(t, ws.Apparatus, "status", "--porcelain"); st != "" {
+		t.Errorf("stash left apparatus unrecorded: %q", st)
+	}
+
+	t.Run("working stashes stay out of history", func(t *testing.T) {
+		write(t, filepath.Join(repo, "run.log"), "x\n")
+		before := run(t, ws.Apparatus, "rev-parse", "HEAD")
+		if _, err := Stash(filepath.Join(repo, "run.log"), "", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if after := run(t, ws.Apparatus, "rev-parse", "HEAD"); after != before {
+			t.Error("a working stash committed to apparatus")
+		}
+	})
+
+	t.Run("an existing unversioned apparatus gets history on the next init", func(t *testing.T) {
+		if err := os.RemoveAll(filepath.Join(ws.Apparatus, ".git")); err != nil {
+			t.Fatal(err)
+		}
+		mustInit(t, repo)
+		if files := run(t, ws.Apparatus, "ls-files"); files != "research/notes/idea.md" {
+			t.Errorf("first commit holds %q", files)
+		}
+		if n, ok := ws.Unrecorded(); !ok || n != 0 {
+			t.Errorf("unrecorded = %d, %v", n, ok)
+		}
+	})
+
+	t.Run("an apparatus path the human chose is left alone", func(t *testing.T) {
+		mine := filepath.Join(t.TempDir(), "notes")
+		write(t, filepath.Join(mine, "a.md"), "x\n")
+		ws.Manifest.Spaces.Apparatus.Path = mine
+		if err := ws.save(); err != nil {
+			t.Fatal(err)
+		}
+		custom := mustInit(t, repo)
+		if _, err := os.Stat(filepath.Join(custom.Apparatus, ".git")); !os.IsNotExist(err) {
+			t.Errorf("vern initialized a repository in a chosen path: %v", err)
+		}
+	})
 }
 
 // A workspace may physically contain its repository and name it by relative path; no link needed.

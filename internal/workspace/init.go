@@ -27,6 +27,9 @@ func Init(repoDir string) (*InitResult, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := ws.keepHistory(); err != nil {
+			return nil, fmt.Errorf("apparatus history: %w", err)
+		}
 		return &InitResult{Workspace: ws, Existing: true}, ws.seen(top)
 	}
 
@@ -62,6 +65,9 @@ func Init(repoDir string) (*InitResult, error) {
 	if err := ws.register(); err != nil {
 		return nil, err
 	}
+	if err := ws.keepHistory(); err != nil {
+		return nil, fmt.Errorf("apparatus history: %w", err)
+	}
 	if _, err := Git(top, "config", "--local", LinkKey, id); err != nil {
 		return nil, err
 	}
@@ -93,6 +99,9 @@ func Attach(repoDir, target string) (ws *Workspace, previous string, err error) 
 		if _, err := Git(top, "config", "--local", LinkKey, ws.ID()); err != nil {
 			return nil, "", err
 		}
+	}
+	if err := ws.keepHistory(); err != nil {
+		return nil, "", fmt.Errorf("apparatus history: %w", err)
 	}
 	return ws, previous, ws.seen(top)
 }
@@ -146,6 +155,15 @@ func checkout(dir string) (top, id string, err error) {
 	if top, err = realPath(top); err != nil {
 		return "", "", err
 	}
+	if isApparatus(top) {
+		return "", "", fmt.Errorf("%s is a workspace's apparatus, not a project; run vern inside the project's repository", Display(top))
+	}
 	id, err = readLink(top)
 	return top, id, err
+}
+
+// isApparatus reports whether top is the apparatus of the workspace directory around it.
+func isApparatus(top string) bool {
+	ws, err := Load(filepath.Dir(top))
+	return err == nil && ws.Apparatus == top
 }

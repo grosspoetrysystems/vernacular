@@ -34,6 +34,8 @@ init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
 registers it in ~/.vern/workspaces/<id>, and stores the id in the repository's
 local Git config as vernacular.workspace. Tracked files are never touched. The
 attachment follows the repository when it moves and is shared by worktrees.
+apparatus/ is its own local Git repository so kept material can be recovered;
+stash --apparatus commits each move there.
 
 attach DIR re-registers a workspace directory, recovering one that moved or a
 lost ~/.vern. To detach: git config --unset vernacular.workspace
@@ -294,6 +296,10 @@ func runStatus(args []string, stdout io.Writer) error {
 			continue
 		}
 		_, _ = fmt.Fprintf(stdout, "  %s, %s\n", plural(tr.Files, "file"), plural(tr.Dirs, "directory"))
+		if n, ok := ws.Unrecorded(); ok && n > 0 && s.name == "apparatus" {
+			_, _ = fmt.Fprintf(stdout, "  %s not in history yet: git -C %s add -A && git -C %s commit\n",
+				plural(n, "change"), shellQuote(ws.Apparatus), shellQuote(ws.Apparatus))
+		}
 		for _, it := range tr.Recent {
 			_, _ = fmt.Fprintf(stdout, "  %8s  %s\n", age(now.Sub(it.Mod)), filepath.ToSlash(it.Path))
 		}
@@ -401,11 +407,14 @@ func runStash(args []string, stdout io.Writer) error {
 	if len(pos) == 2 {
 		shelf = pos[1]
 	}
-	from, dst, err := workspace.Stash(pos[0], shelf, *toApparatus, *tracked)
+	st, err := workspace.Stash(pos[0], shelf, *toApparatus, *tracked)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "Stashed %s\n     → %s\nUndo: mv %s %s\n", workspace.Display(from), workspace.Display(dst), shellQuote(dst), shellQuote(from))
+	_, _ = fmt.Fprintf(stdout, "Stashed %s\n     → %s\nUndo: mv %s %s\n", workspace.Display(st.From), workspace.Display(st.To), shellQuote(st.To), shellQuote(st.From))
+	if st.Commit != nil {
+		_, _ = fmt.Fprintf(stdout, "Not recorded in apparatus history (%v); vern status shows how to record it.\n", st.Commit)
+	}
 	return nil
 }
 
