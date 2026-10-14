@@ -28,6 +28,8 @@ Usage:
   vern stash [--apparatus] [--tracked] SRC [SHELF]
                                        move SRC out of canon onto a shelf in working
                                        (or apparatus)
+  vern stash --undo [ID]               move a stashed path back into canon (default: the
+                                       latest stash)
   vern --version                       print the version
 
 init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
@@ -49,7 +51,8 @@ given, and asks for confirmation unless --yes is given.
 stash is the opposite: SRC must be inside an attached repository, and moves to
 working/SHELF/ (or apparatus/SHELF/ with --apparatus) keeping its name. It never
 overwrites, refuses paths with tracked files unless --tracked is given, and
-prints the command that undoes it.
+records each move with an ID in the workspace's stash.jsonl; stash --undo puts
+the latest one back (repeat it to go further back), stash --undo ID a specific one.
 `
 
 // Version is set at release build time with -ldflags "-X …/internal/cli.Version=X.Y.Z".
@@ -396,24 +399,38 @@ func runStash(args []string, stdout io.Writer) error {
 	fs.SetOutput(io.Discard)
 	toApparatus := fs.Bool("apparatus", false, "stash into apparatus, to keep, instead of working")
 	tracked := fs.Bool("tracked", false, "allow stashing tracked files (Git then shows them deleted)")
+	undo := fs.Bool("undo", false, "move the last stashed path back into canon")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
-	if len(pos) < 1 || len(pos) > 2 {
+	var st workspace.Stashed
+	switch {
+	case *undo && (len(pos) > 1 || *toApparatus || *tracked):
+		return usageError("--undo takes at most a stash ID")
+	case *undo:
+		id := ""
+		if len(pos) == 1 {
+			id = pos[0]
+		}
+		if st, err = workspace.Unstash(".", id); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(stdout, "Restored %s (%s)\n      → %s\n", workspace.Display(st.From), st.ID, workspace.Display(st.To))
+	case len(pos) < 1 || len(pos) > 2:
 		return usageError("expected SRC and an optional SHELF")
+	default:
+		shelf := ""
+		if len(pos) == 2 {
+			shelf = pos[1]
+		}
+		if st, err = workspace.Stash(pos[0], shelf, *toApparatus, *tracked); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(stdout, "Stashed %s (%s)\n     → %s\nUndo: vern stash --undo %s\n", workspace.Display(st.From), st.ID, workspace.Display(st.To), st.ID)
 	}
-	shelf := ""
-	if len(pos) == 2 {
-		shelf = pos[1]
-	}
-	st, err := workspace.Stash(pos[0], shelf, *toApparatus, *tracked)
-	if err != nil {
-		return err
-	}
-	_, _ = fmt.Fprintf(stdout, "Stashed %s\n     → %s\nUndo: mv %s %s\n", workspace.Display(st.From), workspace.Display(st.To), shellQuote(st.To), shellQuote(st.From))
-	if st.Commit != nil {
-		_, _ = fmt.Fprintf(stdout, "Not recorded in apparatus history (%v); vern status shows how to record it.\n", st.Commit)
+	if st.Warn != nil {
+		_, _ = fmt.Fprintf(stdout, "Moved, but not fully recorded: %v\n", st.Warn)
 	}
 	return nil
 }

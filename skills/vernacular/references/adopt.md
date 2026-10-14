@@ -149,13 +149,16 @@ for new shelves only:
     |---|---|---|
     | benchmarks/ | Benchmark runs and the harness to replay them | Rerun before citing; old numbers are not current |
 
-Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
-fix, and an undo block made of the `Undo:` lines `vern stash` printed, preceded by recreating
-any folder that was removed, so it can be pasted as is and reverses every step:
+Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where (with each stash ID),
+references left to fix, and an undo block that reverses every step and can be pasted as is:
+the `vern stash --undo ID` lines `vern stash` printed, newest first, then recreating any
+ignore file that was removed with its folder:
 
 ```sh
-mkdir '/Users/me/code/foo/.substrate' && printf '*\n' > '/Users/me/code/foo/.substrate/.gitignore'
-mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/research' '/Users/me/code/foo/.substrate/research'
+cd '/Users/me/code/foo'
+vern stash --undo st_9c41e2a0
+vern stash --undo st_1a2b3c4d
+printf '*\n' > .substrate/.gitignore
 ```
 
 Leave the project's ignore rules alone, even ones that matched only what moved: a rule like
@@ -172,7 +175,8 @@ Then tell the human, in a few short lines, and go back to the original task. For
 > Kept benchmarks, ADRs, and planning docs in your workspace (apparatus). `git status` is
 > clean; `vern status` shows where they went, and agents read them before planning.
 > To port anything else later, just ask, or from a terminal: `vern stash PATH` for scratch,
-> `vern stash --apparatus PATH` to keep it. Undo is in `adoption-YYYY-MM-DD.md`.
+> `vern stash --apparatus PATH` to keep it. `vern stash --undo` puts the latest back; the full
+> undo is in `adoption-YYYY-MM-DD.md`.
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
 

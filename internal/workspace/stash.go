@@ -1,19 +1,39 @@
 package workspace
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
-// Stashed is the result of a stash. Commit is set when the move into apparatus succeeded but
-// recording it in apparatus's history did not; the material is in place either way.
+// stashLog records every stash, oldest first, as one JSON object per line. Paths are relative to
+// canon and to the workspace directory, so entries survive either one moving.
+const stashLog = "stash.jsonl"
+
+// StashEntry is one recorded stash.
+type StashEntry struct {
+	ID    string    `json:"id"`
+	At    time.Time `json:"at"`
+	Path  string    `json:"path"`            // where it was, relative to canon
+	To    string    `json:"to"`              // where it went, relative to the workspace directory
+	Canon string    `json:"canon,omitempty"` // canon's commit at the time
+}
+
+// Stashed is the result of a stash or its undo. Warn is set when the move succeeded but
+// recording it (in the stash log or apparatus's history) did not; the material is in place
+// either way.
 type Stashed struct {
-	From, To string
-	Commit   error
+	ID, From, To string
+	Warn         error
 }
 
 // Stash moves src out of the attached checkout containing it into the workspace's working, or
@@ -96,10 +116,118 @@ func Stash(src, shelf string, toApparatus, tracked bool) (Stashed, error) {
 		}
 		return Stashed{}, err
 	}
-	out := Stashed{From: s, To: dst}
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	inWs, _ := filepath.Rel(ws.Root, dst)
+	e := StashEntry{ID: "st_" + hex.EncodeToString(b), At: time.Now().UTC().Truncate(time.Second),
+		Path: filepath.ToSlash(rel), To: filepath.ToSlash(inWs), Canon: headShort(top)}
+	out := Stashed{ID: e.ID, From: s, To: dst, Warn: appendEntry(filepath.Join(ws.Root, stashLog), e)}
 	if toApparatus && ws.versioned() {
 		kept, _ := filepath.Rel(ws.Apparatus, dst)
-		out.Commit = ws.commit(kept, "Stash "+filepath.ToSlash(rel)+ref)
+		out.Warn = errors.Join(out.Warn, ws.commit(kept, "Stash "+e.Path+" ("+e.ID+")"+ref))
 	}
 	return out, nil
+}
+
+// Unstash reverses a recorded stash, the one named by id or else the latest, for the workspace
+// of the checkout containing dir, moving the material back to where it was in canon. It never
+// overwrites.
+func Unstash(dir, id string) (Stashed, error) {
+	ws, err := Find(dir)
+	if err != nil {
+		return Stashed{}, err
+	}
+	if ws.Canon == "" {
+		return Stashed{}, errors.New("run vern stash --undo inside the repository")
+	}
+	logPath := filepath.Join(ws.Root, stashLog)
+	entries, err := readEntries(logPath)
+	if err != nil {
+		return Stashed{}, err
+	}
+	i := len(entries) - 1
+	if id != "" {
+		for i >= 0 && entries[i].ID != id {
+			i--
+		}
+	}
+	if i < 0 {
+		if id != "" {
+			return Stashed{}, fmt.Errorf("no stash %s recorded for this workspace (see %s)", id, Display(logPath))
+		}
+		return Stashed{}, errors.New("nothing to undo: no stash recorded for this workspace")
+	}
+	e := entries[i]
+	from, to := filepath.Join(ws.Root, filepath.FromSlash(e.To)), filepath.Join(ws.Canon, filepath.FromSlash(e.Path))
+	if _, err := os.Lstat(from); err != nil {
+		return Stashed{}, fmt.Errorf("%s is no longer in the workspace; nothing undone", Display(from))
+	}
+	if _, err := os.Lstat(to); err == nil {
+		return Stashed{}, fmt.Errorf("%s exists again; undo never overwrites", Display(to))
+	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil { //nolint:gosec // recreating the original parent
+		return Stashed{}, err
+	}
+	if err := os.Rename(from, to); err != nil {
+		return Stashed{}, err
+	}
+	out := Stashed{ID: e.ID, From: from, To: to, Warn: writeEntries(logPath, append(entries[:i:i], entries[i+1:]...))}
+	if within(ws.Apparatus, from) && ws.versioned() {
+		kept, _ := filepath.Rel(ws.Apparatus, from)
+		out.Warn = errors.Join(out.Warn, ws.commit(kept, "Unstash "+e.Path+" ("+e.ID+")"+canonRef(ws.Canon)))
+	}
+	return out, nil
+}
+
+// headShort is canon's current commit, or "" before the first one.
+func headShort(top string) string {
+	sha, _ := Git(top, "rev-parse", "--short", "HEAD")
+	return sha
+}
+
+func appendEntry(path string, e StashEntry) error {
+	line, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // workspace-owned log
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(append(line, '\n'))
+	return errors.Join(err, f.Close())
+}
+
+func readEntries(path string) ([]StashEntry, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // workspace-owned log
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []StashEntry
+	for n, sc := 1, bufio.NewScanner(bytes.NewReader(data)); sc.Scan(); n++ {
+		if len(bytes.TrimSpace(sc.Bytes())) == 0 {
+			continue
+		}
+		var e StashEntry
+		if err := json.Unmarshal(sc.Bytes(), &e); err != nil {
+			return nil, fmt.Errorf("%s:%d: %w", Display(path), n, err)
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+func writeEntries(path string, entries []StashEntry) error {
+	var buf bytes.Buffer
+	for _, e := range entries {
+		line, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		buf.Write(append(line, '\n'))
+	}
+	return os.WriteFile(path, buf.Bytes(), 0o600)
 }
