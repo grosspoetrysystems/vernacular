@@ -30,7 +30,10 @@ install it yourself.
    - `vern path working`: scratch and earlier agents' reports.
 3. Write:
    - scratch, reports, and one-off output to `vern path working`;
-   - material worth keeping to `vern path apparatus`;
+   - material worth keeping to `vern path apparatus`, then record it in apparatus's own
+     Git history: `git -C "$(vern path apparatus)" add -A && git -C "$(vern path apparatus)"
+     commit -m "<what and why>"`. `vern status` says when something is not recorded yet;
+     history is how kept material survives mistakes;
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
