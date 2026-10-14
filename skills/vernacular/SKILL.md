@@ -1,6 +1,6 @@
 ---
 name: vernacular
-description: Use whenever work produces or needs material that supports building a project but is not part of it — research, competitor analysis, plans, design notes, decisions, experiments, benchmarks, evals, scratch pads, side quests, agent reports, handoffs, build or meta infrastructure — and at the start of work in a Git repository, before planning or reporting on project status or direction. Finds and uses the project's private Vernacular workspace outside the repository so this material is kept, findable, and never committed.
+description: Use whenever work produces or needs material that supports building a project but is not part of it — research, competitor analysis, plans, design notes, decisions, experiments, benchmarks, evals, scratch pads, side quests, agent reports, handoffs, build or meta infrastructure — at the start of work in a Git repository, before planning or reporting on project status or direction, and when setting up or adopting Vernacular in a new or existing repository. Finds and uses the project's private Vernacular workspace outside the repository so this material is kept, findable, and never committed.
 ---
 
 # Vernacular workspace
@@ -34,6 +34,14 @@ install it yourself.
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
+5. Asked to port something from the repository into the workspace: `vern stash PATH`
+   puts it in working, the default for anything new. If the human says to keep it, use
+   `vern stash --apparatus PATH [SHELF]` onto the shelf that matches its kind —
+   `ls "$(vern path apparatus)"`, or propose a new shelf if none fits. Don't ask which; say
+   the move in one line ("`notes/` → working"). It keeps the name inside SHELF, never
+   overwrites, and refuses tracked paths; add `--tracked` only after the human approves.
+6. Asked to tidy working, or it has become a pile: offer once to sort it onto shelves
+   ("Tidying working" in `references/adopt.md`).
 
 ### Not set
 
@@ -45,6 +53,14 @@ Only act when you are about to write material that is not part of the project.
 2. Otherwise ask: "No Vernacular workspace here. Run `vern init`?"
 3. Proceed only on yes. Until then, keep the material in the conversation; do not
    write it into the repository.
+4. After `vern init`, offer to bring in what the human already keeps (steps 2–5 of
+   `references/adopt.md`), then go straight back to the task.
+
+## Setting up
+
+When the human asks to set up or adopt Vernacular, is bootstrapping a new project, or right
+after `vern init`, follow `references/adopt.md` in this skill's directory: look, offer the
+kinds of material found as a pick list, shelve only what was picked, finish in three lines.
 
 ## Rules
 

@@ -25,6 +25,9 @@ Usage:
   vern status                          show the workspace and what exists outside canon
   vern promote [--yes] [--allow-findings] SRC DEST
                                        copy SRC from apparatus/working to DEST in canon
+  vern stash [--apparatus] [--tracked] SRC [SHELF]
+                                       move SRC out of canon onto a shelf in working
+                                       (or apparatus)
   vern --version                       print the version
 
 init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
@@ -40,6 +43,11 @@ working, and DEST inside a repository attached to that workspace. It copies; it
 never overwrites, stages, or commits. It refuses destinations canon ignores,
 refuses files that look like secrets or local paths unless --allow-findings is
 given, and asks for confirmation unless --yes is given.
+
+stash is the opposite: SRC must be inside an attached repository, and moves to
+working/SHELF/ (or apparatus/SHELF/ with --apparatus) keeping its name. It never
+overwrites, refuses paths with tracked files unless --tracked is given, and
+prints the command that undoes it.
 `
 
 // Version is set at release build time with -ldflags "-X …/internal/cli.Version=X.Y.Z".
@@ -74,6 +82,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = runStatus(args[1:], stdout)
 	case "promote":
 		err = runPromote(args[1:], stdin, stdout)
+	case "stash":
+		err = runStash(args[1:], stdout)
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stdout, usage)
 		return 0
@@ -373,6 +383,35 @@ func runPromote(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stdout, "%s\n", st)
 	return nil
+}
+
+func runStash(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("stash", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	toApparatus := fs.Bool("apparatus", false, "stash into apparatus, to keep, instead of working")
+	tracked := fs.Bool("tracked", false, "allow stashing tracked files (Git then shows them deleted)")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) < 1 || len(pos) > 2 {
+		return usageError("expected SRC and an optional SHELF")
+	}
+	shelf := ""
+	if len(pos) == 2 {
+		shelf = pos[1]
+	}
+	from, dst, err := workspace.Stash(pos[0], shelf, *toApparatus, *tracked)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "Stashed %s\n     → %s\nUndo: mv %s %s\n", workspace.Display(from), workspace.Display(dst), shellQuote(dst), shellQuote(from))
+	return nil
+}
+
+// shellQuote single-quotes s for a POSIX shell.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func plural(n int, noun string) string {

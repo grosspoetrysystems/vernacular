@@ -277,6 +277,88 @@ func TestPromote(t *testing.T) {
 	}
 }
 
+func TestStash(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	write(t, filepath.Join(repo, ".substrate", ".gitignore"), "*\n")
+	write(t, filepath.Join(repo, ".substrate", "adr", "0001.md"), "decision\n")
+	write(t, filepath.Join(repo, "PLAN.md"), "plan\n")
+	write(t, filepath.Join(repo, "scratch.log"), "log\n")
+	write(t, filepath.Join(repo, "README.md"), "canon\n")
+	write(t, filepath.Join(repo, "ab.md"), "tracked\n")
+	write(t, filepath.Join(repo, "a*.md"), "untracked, glob-like name\n")
+	run(t, repo, "add", "README.md", "ab.md")
+	run(t, repo, "commit", "-q", "-m", "readme")
+	write(t, filepath.Join(ws.Apparatus, "plans", "PLAN.md"), "already shelved\n")
+	unlinked := newRepo(t, "unlinked", true)
+	write(t, filepath.Join(unlinked, "notes.md"), "x\n")
+
+	t.Run("directory moves intact onto a nested shelf", func(t *testing.T) {
+		_, dst, err := Stash(filepath.Join(repo, ".substrate", "adr"), "research/old", true, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(ws.Apparatus, "research", "old", "adr"); dst != want {
+			t.Errorf("dst = %s, want %s", dst, want)
+		}
+		if got, err := os.ReadFile(filepath.Join(dst, "0001.md")); err != nil || string(got) != "decision\n" {
+			t.Fatalf("got %q, %v", got, err)
+		}
+		if _, err := os.Stat(filepath.Join(repo, ".substrate", "adr")); !os.IsNotExist(err) {
+			t.Errorf("source should be gone after stash: %v", err)
+		}
+	})
+
+	t.Run("glob-like name is matched literally", func(t *testing.T) {
+		// As a pathspec, "a*.md" would match the tracked ab.md and refuse an untracked file.
+		if _, _, err := Stash(filepath.Join(repo, "a*.md"), "", false, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("working by default, without a shelf", func(t *testing.T) {
+		if _, dst, err := Stash(filepath.Join(repo, "scratch.log"), "", false, false); err != nil || dst != filepath.Join(ws.Working, "scratch.log") {
+			t.Fatalf("dst %s, err %v", dst, err)
+		}
+	})
+
+	t.Run("tracked only with consent", func(t *testing.T) {
+		if _, _, err := Stash(filepath.Join(repo, "README.md"), "", false, false); err == nil || !strings.Contains(err.Error(), "tracked") {
+			t.Fatalf("err = %v, want tracked refusal", err)
+		}
+		if _, _, err := Stash(filepath.Join(repo, "README.md"), "", false, true); err != nil {
+			t.Fatal(err)
+		}
+		if st := run(t, repo, "status", "--short", "README.md"); st != "D README.md" {
+			t.Errorf("git status = %q, want the deletion left for the human", st)
+		}
+	})
+
+	refusals := []struct {
+		name, src, shelf, want string
+	}{
+		{"overwrite", filepath.Join(repo, "PLAN.md"), "plans", "never overwrites"},
+		{"repository root", repo, "", "repository root"},
+		{"inside .git", filepath.Join(repo, ".git", "config"), "", "not inside a Git work tree"},
+		{"already in the workspace", filepath.Join(ws.Apparatus, "plans", "PLAN.md"), "", "not inside a Git work tree"},
+		{"unattached repository", filepath.Join(unlinked, "notes.md"), "", "not attached"},
+		{"shelf escapes the space", filepath.Join(repo, "PLAN.md"), "../../elsewhere", "relative path inside"},
+		{"missing source", filepath.Join(repo, "nope.md"), "", "does not exist"},
+	}
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := Stash(tc.src, tc.shelf, true, false)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	if _, err := os.Stat(filepath.Join(repo, "PLAN.md")); err != nil {
+		t.Errorf("refused stash must leave the source: %v", err)
+	}
+}
+
 // A workspace may physically contain its repository and name it by relative path; no link needed.
 func TestPromoteInNestedLayoutWithoutLink(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())

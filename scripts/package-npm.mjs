@@ -4,7 +4,7 @@
 // the right one, and the agent skill.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -51,8 +51,7 @@ for (const platform of platforms) {
 }
 
 copyFileSync("LICENSE", join(packageDir, "LICENSE"));
-mkdirSync(join(packageDir, "skills", "vernacular"), { recursive: true });
-copyFileSync("skills/vernacular/SKILL.md", join(packageDir, "skills", "vernacular", "SKILL.md"));
+cpSync("skills", join(packageDir, "skills"), { recursive: true });
 writeFileSync(
   join(packageDir, "bin", "vern.cjs"),
   `#!/usr/bin/env node

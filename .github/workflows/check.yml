@@ -35,3 +35,11 @@ jobs:
         run: go test -cover ./...
       - name: Smoke
         run: go run ./cmd/vern help
+      - name: Skill durability check
+        run: |
+          go build -o "$RUNNER_TEMP/bin/vern" ./cmd/vern
+          export PATH="$RUNNER_TEMP/bin:$PATH" HOME="$RUNNER_TEMP/home"
+          repo="$RUNNER_TEMP/repo"
+          git init -q "$repo"
+          git -C "$repo" -c user.name=ci -c user.email=ci@example.invalid commit -q --allow-empty -m init
+          (cd "$repo" && vern init >/dev/null && sh "$GITHUB_WORKSPACE/skills/vernacular/scripts/check.sh" --durable)

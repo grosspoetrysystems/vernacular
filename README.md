@@ -38,6 +38,16 @@ installed once per machine into each harness's user skill directory. It tells an
 there instead of into the repository, and ask before running `vern init` where there is no
 workspace yet. Nothing is added to any repository or to your instruction files.
 
+Right after `vern init`, or when asked to set up Vernacular, the skill follows
+[`references/adopt.md`](skills/vernacular/references/adopt.md). It looks at what the repository
+already hides from Git (ignored and untracked material, cross-referenced with your ignore rules),
+describes it by kind ("benchmarks, ADRs, planning docs"), and lets you pick which kinds to move.
+Picked material is organized into shelves in the workspace with file names unchanged, and an undo
+block is written alongside. Anything you keep elsewhere (a notes folder, an app) stays where it is.
+[`scripts/check.sh`](skills/vernacular/scripts/check.sh) confirms the attachment;
+`--durable` also proves it survives `git clean -xfd`, a moved repository, a worktree, a reclone,
+and a lost `~/.vern`, on a throwaway clone.
+
 ```sh
 npx skills add grosspoetrysystems/vernacular -g   # detects installed agents, links the skill
 ```
@@ -75,6 +85,8 @@ vern init                 # attach this repository to a new workspace
 vern path working         # absolute path for scratch
 vern path apparatus       # absolute path for durable non-canonical work
 vern status               # workspace, spaces, and what exists outside canon
+vern stash run.log logs   # move run.log out of the repository onto the "logs" shelf in working
+vern stash --apparatus PLAN.md plans   # keep it: onto the "plans" shelf in apparatus
 vern promote "$(vern path apparatus)/notes/design.md" docs/design.md
 ```
 
@@ -87,6 +99,11 @@ describe themselves to agents without the skill.
 `vern promote` copies from apparatus or working into canon. It never overwrites, stages, or
 commits; it refuses destinations the repository ignores, and refuses files that look like
 secrets or local paths unless `--allow-findings` is given.
+
+`vern stash` is the opposite: it moves a path out of the repository onto a shelf (a top-level
+folder) in working, or in apparatus with `--apparatus` for material worth keeping, keeping its
+name. It never overwrites, refuses tracked paths unless `--tracked` is given, and prints the
+`mv` that undoes it.
 
 ## Attachment
 

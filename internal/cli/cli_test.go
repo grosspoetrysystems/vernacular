@@ -70,6 +70,8 @@ func TestExitCodes(t *testing.T) {
 		{"path without space", []string{"path"}, 2},
 		{"path unknown space", []string{"path", "attic"}, 2},
 		{"promote missing DEST", []string{"promote", "x"}, 2},
+		{"stash missing SRC", []string{"stash"}, 2},
+		{"stash extra argument", []string{"stash", "a", "b", "c"}, 2},
 		{"unknown flag", []string{"status", "--verbose"}, 2},
 		{"command help flag", []string{"promote", "-h"}, 0},
 		{"operational failure", []string{"attach", "vrn_00000000"}, 1},
@@ -190,6 +192,29 @@ func TestPromoteArgumentHandling(t *testing.T) {
 	}
 	if r := vern(t, "y\n", "promote", src, "e/"); r.code != 0 {
 		t.Errorf("confirmed promote: exit %d, stderr %q", r.code, r.errOut)
+	}
+}
+
+func TestStashPrintsAWorkingUndo(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	src := filepath.Join(repo, "it's notes")
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "a.md"), []byte("mine\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := mustRun(t, "stash", "it's notes", "research")
+	if _, err := os.Stat(filepath.Join(mustRun(t, "path", "working"), "research", "it's notes", "a.md")); err != nil {
+		t.Fatalf("not stashed: %v\n%s", err, out)
+	}
+	undo := out[strings.Index(out, "Undo: ")+len("Undo: "):]
+	if b, err := exec.Command("sh", "-c", undo).CombinedOutput(); err != nil {
+		t.Fatalf("undo %q: %v %s", undo, err, b)
+	}
+	if got, err := os.ReadFile(filepath.Join(src, "a.md")); err != nil || string(got) != "mine\n" {
+		t.Errorf("undo did not restore: %q, %v", got, err)
 	}
 }
 
