@@ -72,6 +72,8 @@ func TestExitCodes(t *testing.T) {
 		{"promote missing DEST", []string{"promote", "x"}, 2},
 		{"stash missing SRC", []string{"stash"}, 2},
 		{"stash extra argument", []string{"stash", "a", "b", "c"}, 2},
+		{"stash undo with SRC and SHELF", []string{"stash", "--undo", "a", "b"}, 2},
+		{"stash undo with --apparatus", []string{"stash", "--undo", "--apparatus"}, 2},
 		{"unknown flag", []string{"status", "--verbose"}, 2},
 		{"command help flag", []string{"promote", "-h"}, 0},
 		{"operational failure", []string{"attach", "vrn_00000000"}, 1},
@@ -195,26 +197,68 @@ func TestPromoteArgumentHandling(t *testing.T) {
 	}
 }
 
-func TestStashPrintsAWorkingUndo(t *testing.T) {
+func TestStashUndoRestoresByDefaultAndByID(t *testing.T) {
 	repo := setup(t)
 	mustRun(t, "init")
-	src := filepath.Join(repo, "it's notes")
-	if err := os.MkdirAll(src, 0o755); err != nil {
+	for _, name := range []string{"it's notes", "later"} {
+		if err := os.MkdirAll(filepath.Join(repo, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(repo, name, "a.md"), []byte(name+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := mustRun(t, "stash", "it's notes", "research")
+	mustRun(t, "stash", "--apparatus", "later")
+	id := first[strings.Index(first, "--undo ")+len("--undo "):]
+
+	// By ID: the older stash comes back while the newer one stays put.
+	mustRun(t, "stash", "--undo", id)
+	if got, err := os.ReadFile(filepath.Join(repo, "it's notes", "a.md")); err != nil || string(got) != "it's notes\n" {
+		t.Fatalf("undo by ID did not restore: %q, %v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "later")); !os.IsNotExist(err) {
+		t.Fatalf("undo by ID touched another stash: %v", err)
+	}
+	// Default: the latest remaining stash.
+	mustRun(t, "stash", "--undo")
+	if _, err := os.Stat(filepath.Join(repo, "later", "a.md")); err != nil {
+		t.Fatalf("undo did not restore the latest stash: %v", err)
+	}
+	if r := vern(t, "", "stash", "--undo"); r.code != 1 || !strings.Contains(r.errOut, "nothing to undo") {
+		t.Errorf("undo with everything undone: exit %d, %q", r.code, r.errOut)
+	}
+	if r := vern(t, "", "stash", "--undo", id); r.code != 1 || !strings.Contains(r.errOut, "already undone") {
+		t.Errorf("undo of an undone ID: exit %d, %q", r.code, r.errOut)
+	}
+	if r := vern(t, "", "stash", "--undo", "st_nope"); r.code != 1 || !strings.Contains(r.errOut, "no stash st_nope") {
+		t.Errorf("undo of an unknown ID: exit %d, %q", r.code, r.errOut)
+	}
+	// The journal keeps both stashes, each marked undone.
+	journal, err := os.ReadFile(filepath.Join(filepath.Dir(mustRun(t, "path", "working")), "stash.jsonl"))
+	if err != nil || strings.Count(string(journal), "\n") != 2 || strings.Count(string(journal), `"undone_at"`) != 2 {
+		t.Errorf("journal after two undos:\n%s", journal)
+	}
+}
+
+func TestStashUndoNeverOverwrites(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	if err := os.WriteFile(filepath.Join(repo, "PLAN.md"), []byte("old\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(src, "a.md"), []byte("mine\n"), 0o600); err != nil {
+	mustRun(t, "stash", "PLAN.md")
+	if err := os.WriteFile(filepath.Join(repo, "PLAN.md"), []byte("new\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out := mustRun(t, "stash", "it's notes", "research")
-	if _, err := os.Stat(filepath.Join(mustRun(t, "path", "working"), "research", "it's notes", "a.md")); err != nil {
-		t.Fatalf("not stashed: %v\n%s", err, out)
+	if r := vern(t, "", "stash", "--undo"); r.code != 1 || !strings.Contains(r.errOut, "never overwrites") {
+		t.Errorf("exit %d, %q", r.code, r.errOut)
 	}
-	undo := out[strings.Index(out, "Undo: ")+len("Undo: "):]
-	if b, err := exec.Command("sh", "-c", undo).CombinedOutput(); err != nil {
-		t.Fatalf("undo %q: %v %s", undo, err, b)
+	if got, _ := os.ReadFile(filepath.Join(repo, "PLAN.md")); string(got) != "new\n" {
+		t.Errorf("undo overwrote canon: %q", got)
 	}
-	if got, err := os.ReadFile(filepath.Join(src, "a.md")); err != nil || string(got) != "mine\n" {
-		t.Errorf("undo did not restore: %q, %v", got, err)
+	if _, err := os.Stat(filepath.Join(mustRun(t, "path", "working"), "PLAN.md")); err != nil {
+		t.Errorf("refused undo lost the stashed copy: %v", err)
 	}
 }
 

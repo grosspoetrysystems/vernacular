@@ -30,7 +30,8 @@ the main skill), or `vern attach ID` if `vern attach` lists a workspace last see
 another checkout of this repository.
 
 New project: run `vern init` before any bootstrap tool or agent generates material, so the
-first commit never sees it. It works before the first commit. Then skip to step 5.
+first commit never sees it. It works before the first commit. Write the one-line record
+(step 3, after the table: "new project, nothing to adopt"), then skip to step 5.
 
 ## 2. Look (read-only, seconds)
 
@@ -101,10 +102,14 @@ folder somewhere else, an app?"
 
 | Answer | Do |
 |---|---|
-| Not now / nothing picked | Stop. Back to the task. |
+| Not now / nothing picked / keeps nothing | Back to the task. |
 | Move all, or some kinds picked | Step 4, with those kinds. |
 | A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
 | An app or a notepad | Add an *Elsewhere* section to `$(vern path apparatus)/README.md`: one line per place, what lives there and how to reach it. Offer to paste anything they want kept as files. |
+
+Every row ends with `$(vern path apparatus)/adoption-YYYY-MM-DD.md`, committed: what was
+offered, the answer, and for moves the record in step 4. It is how later sessions know
+adoption already ran, so the offer is never repeated.
 
 ## 4. Shelve and move
 
@@ -149,13 +154,16 @@ for new shelves only:
     |---|---|---|
     | benchmarks/ | Benchmark runs and the harness to replay them | Rerun before citing; old numbers are not current |
 
-Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where, references left to
-fix, and an undo block made of the `Undo:` lines `vern stash` printed, preceded by recreating
-any folder that was removed, so it can be pasted as is and reverses every step:
+Write `$(vern path apparatus)/adoption-YYYY-MM-DD.md`: what moved where (with each stash ID),
+references left to fix, and an undo block that reverses every step and can be pasted as is:
+the `vern stash --undo ID` lines `vern stash` printed, newest first, then recreating any
+ignore file that was removed with its folder:
 
 ```sh
-mkdir '/Users/me/code/foo/.substrate' && printf '*\n' > '/Users/me/code/foo/.substrate/.gitignore'
-mv '/Users/me/.vern/data/vrn_7f29c1a0/apparatus/research' '/Users/me/code/foo/.substrate/research'
+cd '/Users/me/code/foo'
+vern stash --undo st_9c41e2a0
+vern stash --undo st_1a2b3c4d
+printf '*\n' > .substrate/.gitignore
 ```
 
 Leave the project's ignore rules alone, even ones that matched only what moved: a rule like
@@ -172,7 +180,8 @@ Then tell the human, in a few short lines, and go back to the original task. For
 > Kept benchmarks, ADRs, and planning docs in your workspace (apparatus). `git status` is
 > clean; `vern status` shows where they went, and agents read them before planning.
 > To port anything else later, just ask, or from a terminal: `vern stash PATH` for scratch,
-> `vern stash --apparatus PATH` to keep it. Undo is in `adoption-YYYY-MM-DD.md`.
+> `vern stash --apparatus PATH` to keep it. `vern stash --undo` puts the latest back; the full
+> undo is in `adoption-YYYY-MM-DD.md`.
 
 If tracked deletions were approved, say they are waiting in `git status` instead of "clean".
 
@@ -204,5 +213,6 @@ Working is scratch and makes no promise of order. When the human asks to tidy it
 
 Same rules as adoption: a pick list by kind, a preview tree, no renames, no deletion, an
 undo block in the record. Moves inside the workspace use plain `mv` (`vern stash` only takes
-material out of the repository). Nothing is thrown away; clearing working out stays the
-human's call.
+material out of the repository); a stash moved this way can no longer be undone with
+`vern stash --undo`, so the record's undo block covers it. Nothing is thrown away; clearing
+working out stays the human's call.

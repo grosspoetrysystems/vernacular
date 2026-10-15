@@ -373,11 +373,11 @@ func TestApparatusHistory(t *testing.T) {
 
 	write(t, filepath.Join(repo, "notes", "idea.md"), "keep me\n")
 	st, err := Stash(filepath.Join(repo, "notes"), "research", true, false)
-	if err != nil || st.Commit != nil {
-		t.Fatalf("stash: %v, commit: %v", err, st.Commit)
+	if err != nil || st.Warn != nil {
+		t.Fatalf("stash: %v, warn: %v", err, st.Warn)
 	}
 	sha := run(t, repo, "rev-parse", "--short", "HEAD")
-	if msg := run(t, ws.Apparatus, "log", "-1", "--format=%B"); msg != "Stash notes\n\nCanon: app "+sha {
+	if msg := run(t, ws.Apparatus, "log", "-1", "--format=%B"); msg != "Stash notes ("+st.ID+")\n\nCanon: app "+sha {
 		t.Errorf("commit message = %q", msg)
 	}
 	if st := run(t, ws.Apparatus, "status", "--porcelain"); st != "" {
@@ -423,6 +423,30 @@ func TestApparatusHistory(t *testing.T) {
 			t.Errorf("vern initialized a repository in a chosen path: %v", err)
 		}
 	})
+}
+
+func TestUnstashIsRecordedInHistory(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	write(t, filepath.Join(repo, "notes", "idea.md"), "keep me\n")
+	st, err := Stash(filepath.Join(repo, "notes"), "research", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := Unstash(repo, "")
+	if err != nil || back.ID != st.ID || back.Warn != nil {
+		t.Fatalf("unstash = %+v, %v", back, err)
+	}
+	if got, err := os.ReadFile(filepath.Join(repo, "notes", "idea.md")); err != nil || string(got) != "keep me\n" {
+		t.Fatalf("not restored: %q, %v", got, err)
+	}
+	if msg := run(t, ws.Apparatus, "log", "-1", "--format=%s"); msg != "Unstash notes ("+st.ID+")" {
+		t.Errorf("last apparatus commit = %q", msg)
+	}
+	if files := run(t, ws.Apparatus, "ls-files"); files != "" {
+		t.Errorf("apparatus still tracks %q", files)
+	}
 }
 
 // A workspace may physically contain its repository and name it by relative path; no link needed.
