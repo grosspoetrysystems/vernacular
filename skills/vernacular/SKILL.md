@@ -23,9 +23,9 @@ install it yourself.
 
 ### Set
 
-1. `vern status` shows the workspace and what is in it. Apparatus and working both empty
-   means `vern init` ran (perhaps by hand) and adoption never did: offer it once, steps 2–5
-   of `references/adopt.md`, then go straight back to the task.
+1. `vern status` shows the workspace and what is in it. No `adoption-*.md` in
+   `vern path apparatus` means adoption never ran (`vern init` was run by hand): offer it
+   once, steps 2–5 of `references/adopt.md`, then go straight back to the task.
 2. Before planning or reporting, read what is relevant:
    - `vern path apparatus`: durable material — product documents, decisions,
      research, experiments.

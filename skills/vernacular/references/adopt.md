@@ -30,7 +30,8 @@ the main skill), or `vern attach ID` if `vern attach` lists a workspace last see
 another checkout of this repository.
 
 New project: run `vern init` before any bootstrap tool or agent generates material, so the
-first commit never sees it. It works before the first commit. Then skip to step 5.
+first commit never sees it. It works before the first commit. Write the one-line record
+(step 3, after the table: "new project, nothing to adopt"), then skip to step 5.
 
 ## 2. Look (read-only, seconds)
 
@@ -101,10 +102,14 @@ folder somewhere else, an app?"
 
 | Answer | Do |
 |---|---|
-| Not now / nothing picked / keeps nothing | Write one line to `$(vern path working)/adoption-YYYY-MM-DD.md` (what was offered, the answer) so the offer is not repeated. Back to the task. |
+| Not now / nothing picked / keeps nothing | Back to the task. |
 | Move all, or some kinds picked | Step 4, with those kinds. |
 | A folder outside the repository | Use it in place: set `spaces.apparatus.path` in the workspace's `vernacular.yml` (`vern status` prints its directory) to that folder's absolute path. Nothing moves, nothing is regrouped. |
 | An app or a notepad | Add an *Elsewhere* section to `$(vern path apparatus)/README.md`: one line per place, what lives there and how to reach it. Offer to paste anything they want kept as files. |
+
+Every row ends with `$(vern path apparatus)/adoption-YYYY-MM-DD.md`, committed: what was
+offered, the answer, and for moves the record in step 4. It is how later sessions know
+adoption already ran, so the offer is never repeated.
 
 ## 4. Shelve and move
 
