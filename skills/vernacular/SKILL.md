@@ -53,12 +53,17 @@ install it yourself.
 
 ### Not set
 
-Only act when you are about to write material that is not part of the project.
+Ask before the first step that produces material that is not part of the project: a plan,
+research, a report, scratch — or before bootstrapping a new project (an empty directory, or
+a repository with no commits), which produces both. Keeping the plan in chat to avoid the
+question skips it; ask anyway. Code-only tasks in an established repository need nothing.
 
 1. `vern attach` lists existing workspaces and the checkout each was last seen
    with. If one matches this repository (a moved or recloned checkout), ask
    whether to attach it: `vern attach ID`.
-2. Otherwise ask: "No Vernacular workspace here. Run `vern init`?"
+2. Otherwise ask, as one question the human settles with Enter: "No Vernacular workspace
+   here. Run `vern init` so plans and research stay out of the repo? (Y/n)". A new project
+   without Git yet: `git init` first; `vern init` works before the first commit.
 3. Proceed only on yes. Until then, keep the material in the conversation; do not
    write it into the repository.
 4. After `vern init`, offer to bring in what the human already keeps (steps 2–5 of
