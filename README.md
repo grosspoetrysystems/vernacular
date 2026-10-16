@@ -11,11 +11,21 @@ research, reports, benchmark runs, scratch. Today it usually lands in one of thr
 
 - **Committed.** `PLAN.md` and `REPORT.md` at the root slip into pull requests and become
   history nobody meant to publish.
-- **Hidden in the tree.** A self-ignoring folder or an exclude rule keeps it out of commits,
-  but `git clean -xfd` deletes it, a fresh clone or worktree doesn't have it, and tools that
-  walk the tree still trip over it.
+- **Kept out by hand.** Each developer improvises a workaround: an ignored notes folder, an
+  exclude rule, a naming convention. It is informal and pruned by hand. Agents sometimes infer
+  the convention and often don't, and whatever they learned is gone with the next session or
+  the next model. Meanwhile `git clean -xfd` deletes it, and a fresh clone or worktree doesn't
+  have it.
 - **Thrown away.** It stays in the chat and is gone when the session ends, so the next agent
   starts cold and redoes the research.
+
+```mermaid
+flowchart LR
+  agent[Agent] -->|code| repo[(Repository)]
+  agent -->|plans, research, reports| repo
+  repo --> prs[Pull requests]
+  repo -.->|git clean, fresh clone| lost[Lost]
+```
 
 That material is often the best context for the work. It needs a home outside the repository
 that agents can find and read.
@@ -30,20 +40,11 @@ that agents can find and read.
 
 ```mermaid
 flowchart LR
-  subgraph after [With Vernacular]
-    a2[Agent] -->|code| r2[(Repository)]
-    a2 -->|scratch, reports| w[working]
-    a2 -->|kept material| ap[apparatus<br/>own Git history]
-    ap -->|read before planning| a2
-    ap -->|vern promote, you commit| r2
-    r2 -->|vern stash| ap
-  end
-  subgraph before [Without Vernacular]
-    a1[Agent] -->|code| r1[(Repository)]
-    a1 -->|plans, research, reports| r1
-    r1 --> pr[Pull requests]
-    r1 -.->|git clean, fresh clone| lost[Lost]
-  end
+  agent[Agent] -->|code| repo[(Repository)]
+  agent -->|scratch, reports| working[working]
+  agent -->|kept material| apparatus[apparatus<br/>own Git history]
+  apparatus -.->|read back| agent
+  apparatus -->|vern promote| repo
 ```
 
 ## Promises
