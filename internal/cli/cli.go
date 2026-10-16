@@ -30,6 +30,8 @@ Usage:
                                        (or apparatus)
   vern stash --undo [ID]               move a stashed path back into canon (default: the
                                        latest stash)
+  vern burn                            delete this repository's workspace and everything
+                                       in it, after you type its ID
   vern --version                       print the version
 
 init creates ~/.vern/data/<id>/ with vernacular.yml, apparatus/, and working/,
@@ -40,7 +42,14 @@ apparatus/ is its own local Git repository so kept material can be recovered;
 stash --apparatus commits each move there.
 
 attach DIR re-registers a workspace directory, recovering one that moved or a
-lost ~/.vern. To detach: git config --unset vernacular.workspace
+lost ~/.vern. To detach: git config --unset vernacular.workspace. vern repairs
+its own registry when a workspace is still in ~/.vern/data/<id>.
+
+burn shows what it will delete (files, apparatus changes not yet saved), asks
+you to type the workspace ID, then removes the workspace directory with its
+apparatus history, its registry entry, and this repository's link. Nothing can
+recover it. Spaces you pointed outside the workspace directory are left alone.
+Run it again to clean up after a workspace directory you deleted by hand.
 
 promote works from any directory: SRC must be inside a workspace's apparatus or
 working, and DEST inside a repository attached to that workspace. It copies; it
@@ -89,6 +98,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = runPromote(args[1:], stdin, stdout)
 	case "stash":
 		err = runStash(args[1:], stdout)
+	case "burn":
+		err = runBurn(args[1:], stdin, stdout)
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stdout, usage)
 		return 0
@@ -440,4 +451,43 @@ func plural(n int, noun string) string {
 		return fmt.Sprintf("%d %sies", n, noun[:len(noun)-1])
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+func runBurn(args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := flag.NewFlagSet("burn", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	pos, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) > 0 {
+		return usageError("burn takes no arguments; run it inside the repository")
+	}
+	b, err := workspace.PlanBurn(".")
+	if err != nil {
+		return err
+	}
+	if b.Gone {
+		_, _ = fmt.Fprintf(stdout, "Workspace %s is already gone. Burning removes what is left: its registry entry and this repository's link.\n", b.ID)
+	} else {
+		_, _ = fmt.Fprintf(stdout, "Burn workspace %s at %s?\n", b.ID, workspace.Abbrev(b.Root))
+		_, _ = fmt.Fprintf(stdout, "  apparatus  %s\n  working    %s\n", plural(b.Apparatus.Files, "file"), plural(b.Working.Files, "file"))
+		if b.Unsaved > 0 {
+			_, _ = fmt.Fprintf(stdout, "  %s in apparatus not saved to its history\n", plural(b.Unsaved, "change"))
+		}
+		for _, k := range b.Kept {
+			_, _ = fmt.Fprintf(stdout, "  kept: %s (you chose it; vern leaves it alone)\n", workspace.Abbrev(k))
+		}
+		_, _ = fmt.Fprintln(stdout, "This deletes them and apparatus history. Nothing can recover them.")
+	}
+	_, _ = fmt.Fprintf(stdout, "Type %s to confirm: ", b.ID)
+	answer, _ := bufio.NewReader(stdin).ReadString('\n')
+	if strings.TrimSpace(answer) != b.ID {
+		return errors.New("not burned: the answer did not match the workspace ID")
+	}
+	if err := b.Apply(); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "\nBurned %s. This repository is detached; vern init starts a new workspace.\n", b.ID)
+	return nil
 }

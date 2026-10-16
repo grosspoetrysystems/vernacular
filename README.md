@@ -71,8 +71,10 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
   fetches.
 - **Agents ask once.** An agent never creates a workspace or moves your material without a
   yes, and one Enter answers.
-- **Leaving is free.** Unset the config line and remove the skill link; the workspace stays
-  behind as ordinary files.
+- **Leaving is your choice.** Unset the config line and the workspace stays behind as ordinary
+  files; `vern burn` deletes it and everything vern recorded about it, after you type its ID.
+- **vern repairs itself.** A workspace in its default place is found again even if its
+  registry entry is lost or stale.
 
 ## Get started
 
@@ -142,6 +144,7 @@ lost `~/.vern`, on a throwaway clone.
 | `vern promote SRC DEST` | Copies from apparatus or working into the repository; refuses ignored destinations, and files that look like secrets or local paths unless `--allow-findings` |
 | `vern stash [--apparatus] SRC [SHELF]` | Moves a path out of the repository onto a shelf in working, or apparatus to keep it, name unchanged |
 | `vern stash --undo [ID]` | Puts the latest stash back, or the one with that ID |
+| `vern burn` | Deletes this repository's workspace, apparatus history included, its registry entry, and the link, after you type its ID; also cleans up after a workspace folder you deleted by hand |
 
 ```sh
 vern stash run.log logs                # onto the "logs" shelf in working
@@ -181,7 +184,8 @@ when it moves and is shared by its worktrees.
 vern attach                             # list registered workspaces
 vern attach vrn_1a2b3c4d                # attach this repository to an existing workspace
 vern attach ~/.vern/data/vrn_1a2b3c4d   # re-register a moved workspace, or a lost ~/.vern
-git config --unset vernacular.workspace # detach
+git config --unset vernacular.workspace # detach, keeping the workspace
+vern burn                               # delete the workspace and every trace of it
 ```
 
 ## Contributing

@@ -286,3 +286,26 @@ func TestAttachListing(t *testing.T) {
 		t.Errorf("listing lacks broken entry:\n%s", out)
 	}
 }
+
+func TestBurnNeedsTheTypedID(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	root := filepath.Dir(mustRun(t, "path", "working"))
+	if r := vern(t, "yes\n", "burn"); r.code != 1 || !strings.Contains(r.errOut, "not burned") {
+		t.Fatalf("wrong answer: exit %d, %q", r.code, r.errOut)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("wrong answer deleted the workspace: %v", err)
+	}
+	id := filepath.Base(root)
+	if r := vern(t, id+"\n", "burn"); r.code != 0 || !strings.Contains(r.out, "Burned "+id) {
+		t.Fatalf("burn: exit %d\n%s%s", r.code, r.out, r.errOut)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Errorf("workspace survived: %v", err)
+	}
+	if r := vern(t, "", "status"); r.code == 0 {
+		t.Errorf("repository still attached after burn")
+	}
+	_ = repo
+}

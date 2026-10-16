@@ -80,6 +80,8 @@ kinds of material found as a pick list, shelve only what was picked, finish in t
 ## Rules
 
 - Never commit, stage, or copy workspace material into the repository yourself.
+- Never run `vern burn`; only the human does, at a terminal. It deletes apparatus and its
+  history beyond recovery.
 - Workspace paths are machine-specific: never write them into tracked files.
 - What enters the repository is ordinary project work. Its commits, pull requests, and docs
   follow the project's own conventions and style guides, and never mention Vernacular, the

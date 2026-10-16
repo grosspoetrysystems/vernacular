@@ -109,7 +109,7 @@ func loadID(id, canon string) (*Workspace, error) {
 		return nil, err
 	}
 	if _, err := os.Stat(filepath.Join(root, ManifestName)); errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("workspace %s is registered at %s, which has no %s\n  if it moved: vern attach NEW_DIR", id, Display(root), ManifestName)
+		return nil, fmt.Errorf("workspace %s is registered at %s, which has no %s\n  if it moved:   vern attach NEW_DIR\n  if it is gone: vern burn removes what is left", id, Display(root), ManifestName)
 	}
 	ws, err := load(root, canon)
 	if err != nil {
@@ -121,7 +121,9 @@ func loadID(id, canon string) (*Workspace, error) {
 	return ws, nil
 }
 
-// lookup reads the registry pointer for id.
+// lookup reads the registry pointer for id. A missing pointer, or one naming a directory that no
+// longer holds the workspace, is repaired when the workspace is in its default place,
+// ~/.vern/data/ID: vern relinks itself instead of asking the human to.
 func lookup(id string) (string, error) {
 	if !validID.MatchString(id) {
 		return "", fmt.Errorf("invalid workspace id %q", id)
@@ -131,14 +133,23 @@ func lookup(id string) (string, error) {
 		return "", err
 	}
 	data, err := os.ReadFile(filepath.Join(home, "workspaces", id)) //nolint:gosec // id is validated
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	root := strings.TrimSpace(string(data))
+	if err == nil {
+		if _, serr := os.Stat(filepath.Join(root, ManifestName)); serr == nil { //nolint:gosec // root is our own registry entry
+			return root, nil
+		}
+	}
+	if ws, lerr := Load(filepath.Join(home, "data", id)); lerr == nil && ws.ID() == id {
+		return ws.Root, ws.register()
+	}
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("workspace %s is not registered in %s\n  if its directory still exists: vern attach DIR\n  to start fresh:                 git config --unset %s && vern init",
 			id, Display(filepath.Join(home, "workspaces")), LinkKey)
 	}
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
+	return root, nil
 }
 
 // register points ~/.vern/workspaces/ID at ws.Root.
