@@ -209,7 +209,11 @@ func TestStashUndoRestoresByDefaultAndByID(t *testing.T) {
 		}
 	}
 	first := mustRun(t, "stash", "it's notes", "research")
-	mustRun(t, "stash", "--apparatus", "later")
+	kept := mustRun(t, "stash", "--apparatus", "later")
+	head, err := exec.Command("git", "-C", mustRun(t, "path", "apparatus"), "rev-parse", "--short", "HEAD").Output()
+	if err != nil || !strings.Contains(kept, "Saved in apparatus history ("+strings.TrimSpace(string(head))+")") {
+		t.Errorf("apparatus stash did not name its save point %s:\n%s", head, kept)
+	}
 	id := first[strings.Index(first, "--undo ")+len("--undo "):]
 
 	// By ID: the older stash comes back while the newer one stays put.
