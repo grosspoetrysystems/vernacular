@@ -237,6 +237,9 @@ func TestPromote(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(ws.Apparatus, "research", "parser.md")); err != nil {
 			t.Errorf("source should remain after promotion: %v", err)
 		}
+		if staged := run(t, repo, "diff", "--cached", "--name-only"); staged != "" {
+			t.Errorf("promote staged %q", staged)
+		}
 	})
 
 	t.Run("directory copies recursively to new path", func(t *testing.T) {

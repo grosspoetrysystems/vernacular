@@ -1,8 +1,8 @@
 # Vernacular
 
-Vernacular gives a Git repository two private companion spaces on your machine, so the
-material a project generates while it is being built does not have to live in the repository
-or be thrown away.
+Vernacular gives a Git repository two private companion spaces on your machine, so what you
+and your agents produce while building a project neither lives in the repository nor gets
+thrown away.
 
 | Space | Holds | Lives |
 |---|---|---|
@@ -10,7 +10,7 @@ or be thrown away.
 | **apparatus** | Durable work that is not canon: product documents, research, decisions, experiments, personal method | `~/.vern/data/<id>/apparatus`, with its own Git history |
 | **working** | Scratch, agent reports, temporary output; disposable | `~/.vern/data/<id>/working` |
 
-It matters most with coding agents: they generate plans, reports, and research that otherwise
+Coding agents gain the most: they write plans, reports, and research that would otherwise
 land in the repository, and they work better when they can read that material back.
 
 ## Promises
@@ -19,11 +19,12 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
 
 - **No trace in the repository.** One line of local Git config. No tracked file, ignore rule,
   hook, or commit, so nothing reaches patches or pull requests.
-- **Your project speaks its own language.** Material that becomes part of the project arrives
-  as ordinary work, committed by you in your project's style; Vernacular's vocabulary stays in
-  the workspace.
-- **Out of Git's reach.** Apparatus and working live outside the repository; `git clean -xfd`
-  and anything else Git does there cannot touch them.
+- **Changes to the project are yours.** Material that becomes part of the project arrives as
+  ordinary work you commit in the project's own style. vern never commits there, and agents
+  keep Vernacular's vocabulary out of project commits, pull requests, and docs.
+- **Safe from the project's Git.** Apparatus and working live outside the repository, so
+  `git clean -xfd`, resets, and checkouts in the project cannot touch them. (Apparatus keeps
+  its own, separate history; see [History](#history).)
 - **Never overwrites.** `promote`, `stash`, and `stash --undo` refuse a destination that exists.
 - **Your project's history changes only on purpose.** Tracked files move only with `--tracked`;
   `promote` copies in and never stages or commits.
@@ -59,8 +60,7 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
    Or link `skills/vernacular` from a checkout (or from the npm package) into your agent's
    user skill directory yourself. Removing the skill is deleting the link.
 
-3. If your agent runs in a sandbox, allow it to read and write `~/.vern`, once per machine,
-   the same way you would grant any directory outside the project.
+3. If your agent runs in a sandbox, allow it to read and write `~/.vern`, once per machine.
 4. In a repository, ask your agent to **set up Vernacular**, or run `vern init` yourself and
    then ask. The agent offers to move what you already keep in the repository into the
    workspace, then goes back to work.
@@ -115,10 +115,10 @@ vern stash --apparatus PLAN.md plans   # keep it: onto the "plans" shelf in appa
 vern promote "$(vern path apparatus)/notes/design.md" docs/design.md
 ```
 
-`vern stash` is the exception, not the routine: once agents write to the workspace, little lands
-in the repository by mistake. It is for adoption, a misfire, or a note that became worth keeping
+Once agents write to the workspace, little lands in the repository by mistake, so you'll
+rarely need `vern stash`. It covers adoption, a misfire, or a note that became worth keeping
 but not publishing. Each stash gets an ID and a line in the workspace's `stash.jsonl`; an undo
-marks its line rather than deleting it, so the journal keeps the whole trail.
+marks its line instead of deleting it, so the journal keeps the whole trail.
 
 Run `vern help` for details.
 
@@ -126,11 +126,11 @@ Run `vern help` for details.
 
 - **Apparatus is its own Git repository**, separate from the project's. `vern init` creates
   it, and adds it to existing workspaces.
-- Commits there are save points, not a chronology: `vern stash --apparatus` saves each move
-  and names the project commit it came from; agents save each piece of work they keep; both
-  say so when they do. At the start of a session, an agent saves anything left unsaved.
-- That history is private, so its messages can be as terse or idiosyncratic as is useful to
-  you; nothing in it reaches the project.
+- Commits there are plain save points. `vern stash --apparatus` saves each move and names the
+  project commit it came from; agents save each piece of work they keep. Both tell you when
+  they save, and an agent starting a session saves anything left unsaved.
+- That history is private, so its messages can be as terse or idiosyncratic as suits you.
+  None of it reaches the project.
 - vern's own saves need no Git setup: they skip signing and use a `vern` identity if you have
   none, without changing the repository's config.
 - Local only; nothing is pushed.
