@@ -4,122 +4,131 @@ Vernacular gives a Git repository two private companion spaces on your machine, 
 material a project generates while it is being built does not have to live in the repository
 or be thrown away.
 
-- **canon** — the Git repository. What the project promises.
-- **apparatus** — durable work that is not canon: product documents, research, decisions,
-  experiments, personal method.
-- **working** — scratch, agent reports, temporary output. Disposable.
+| Space | Holds | Lives |
+|---|---|---|
+| **canon** | What the project promises | The Git repository |
+| **apparatus** | Durable work that is not canon: product documents, research, decisions, experiments, personal method | `~/.vern/data/<id>/apparatus`, with its own Git history |
+| **working** | Scratch, agent reports, temporary output; disposable | `~/.vern/data/<id>/working` |
 
-Apparatus and working live under `~/.vern/data/<id>/`, outside the repository. `git clean -xfd`
-cannot reach them, no `.gitignore` entry is needed, and nothing in the repository changes except
-one line of local Git config. Nothing reaches commits, patches, or pull requests, so Vernacular
-is as usable in a repository you clone to fix one thing or review as in your own.
+It matters most with coding agents: they generate plans, reports, and research that otherwise
+land in the repository, and they work better when they can read that material back.
 
-This matters most with coding agents, which generate plans, reports, and research that otherwise
-land in the repository and get committed, and which work better when they can read that material
-back.
+## Promises
 
-## Install
+What Vernacular guarantees. A change that breaks one of these is a bug.
 
-```sh
-npm install --global @grosspoetrysystems/vernacular   # from v0.1.0; prebuilt binary and the agent skill
-go install github.com/grosspoetrysystems/vernacular/cmd/vern@latest
-```
+- **No trace in the repository.** One line of local Git config. No tracked file, ignore rule,
+  hook, or commit, so nothing reaches patches or pull requests.
+- **Out of Git's reach.** Apparatus and working live outside the repository; `git clean -xfd`
+  and anything else Git does there cannot touch them.
+- **Never overwrites.** `promote`, `stash`, and `stash --undo` refuse a destination that exists.
+- **Your project's history changes only on purpose.** Tracked files move only with `--tracked`;
+  `promote` copies in and never stages or commits.
+- **Every move can be undone.** `stash` prints its undo; adoption writes one.
+- **Kept material has history.** vern commits what it moves into apparatus; anything else
+  there shows in `vern status` until it is committed.
+- **The attachment survives** a moved repository, worktrees, a reclone, and a lost `~/.vern`.
+- **No setup, no network.** Works without a Git identity or signing setup; vern never pushes or
+  fetches.
+- **Agents ask once.** An agent never creates a workspace or moves your material without a
+  yes, and one Enter answers.
+- **Leaving is free.** Unset the config line and remove the skill link; the workspace stays
+  behind as ordinary files.
 
-`vern` must be on your `PATH` (`go install` puts it in `$(go env GOPATH)/bin`). Release
-archives on the [releases page](https://github.com/grosspoetrysystems/vernacular/releases) carry a
-cosign-signed checksum file and GitHub build provenance (`gh attestation verify FILE --repo
-grosspoetrysystems/vernacular`); npm packages are published with provenance.
+## Get started
 
-## Agents
+1. Install `vern`, either way (it must be on your `PATH`; `go install` puts it in
+   `$(go env GOPATH)/bin`):
 
-Agents learn about Vernacular from the `vernacular` [agent skill](skills/vernacular/SKILL.md),
-installed once per machine into each harness's user skill directory. It tells an agent to check
-`git config vernacular.workspace`, read the workspace before planning, write scratch and research
-there instead of into the repository, and ask before running `vern init` where there is no
-workspace yet. Nothing is added to any repository or to your instruction files.
+   ```sh
+   npm install --global @grosspoetrysystems/vernacular   # prebuilt binary; the skill is inside
+   go install github.com/grosspoetrysystems/vernacular/cmd/vern@latest   # or build from source
+   ```
 
-Right after `vern init`, or when asked to set up Vernacular, the skill follows
-[`references/adopt.md`](skills/vernacular/references/adopt.md). It looks at what the repository
-already hides from Git (ignored and untracked material, cross-referenced with your ignore rules),
-describes it by kind ("benchmarks, ADRs, planning docs"), and lets you pick which kinds to move.
-Picked material is organized into shelves in the workspace with file names unchanged, and an undo
-block is written alongside. Anything you keep elsewhere (a notes folder, an app) stays where it is.
-[`scripts/check.sh`](skills/vernacular/scripts/check.sh) confirms the attachment;
-`--durable` also proves it survives `git clean -xfd`, a moved repository, a worktree, a reclone,
-and a lost `~/.vern`, on a throwaway clone.
+2. Install the agent skill once per machine. It is a standard [Agent Skill](https://agentskills.io)
+   (a `SKILL.md` folder), so any agent that supports Agent Skills can use it:
 
-```sh
-npx skills add grosspoetrysystems/vernacular -g   # detects installed agents, links the skill
-```
+   ```sh
+   npx skills add grosspoetrysystems/vernacular -g   # links it for each agent it finds installed
+   ```
 
-Or link it by hand from a checkout of this repository:
+   Or link `skills/vernacular` from a checkout (or from the npm package) into your agent's
+   user skill directory yourself. Removing the skill is deleting the link.
 
-| Harness | User skill directory |
+3. If your agent runs in a sandbox, allow it to read and write `~/.vern`, once per machine,
+   the same way you would grant any directory outside the project.
+4. In a repository, ask your agent to **set up Vernacular**, or run `vern init` yourself and
+   then ask. The agent offers to move what you already keep in the repository into the
+   workspace, then goes back to work.
+
+Each release's checksum file is signed with cosign and carries GitHub build provenance
+(`gh attestation verify FILE --repo grosspoetrysystems/vernacular`); npm packages are published
+with provenance.
+
+## What the agent skill does
+
+The [`vernacular` skill](skills/vernacular/SKILL.md) is the whole agent integration. Nothing is
+added to any repository or to your instruction files.
+
+| Situation | The agent |
 |---|---|
-| Claude Code | `~/.claude/skills/` |
-| Codex, pi, OMP | `~/.agents/skills/` |
-| Antigravity CLI | `~/.gemini/antigravity-cli/skills/` |
-| Cursor | `~/.cursor/skills/` |
-| GitHub Copilot | `~/.copilot/skills/` |
-| Gemini CLI | `~/.gemini/skills/` |
+| The repository has a workspace | Reads apparatus and working before planning; writes scratch and reports to working and kept material to apparatus, then commits apparatus |
+| No workspace, and about to plan, research, or bootstrap a project | Asks once whether to run `vern init`; Enter accepts |
+| Right after `vern init`, or asked to set up | Runs adoption, once per workspace |
+| Something non-project landed in the repository | Moves it out with `vern stash` |
+
+Adoption ([`references/adopt.md`](skills/vernacular/references/adopt.md)):
+
+- looks at what the repository already hides from Git (ignored and untracked material, read
+  against your ignore rules) and describes it by kind: "benchmarks, ADRs, planning docs";
+- asks one question, *Move all of it / Let me choose / Not now*, with a preview of where each
+  kind goes;
+- moves picked material onto shelves in apparatus with file names unchanged, and removes a
+  hiding folder the move emptied;
+- writes `adoption-YYYY-MM-DD.md` in apparatus with what moved and an undo block, and flags
+  instructions in the repository that would send material back in;
+- leaves anything you keep elsewhere (a notes folder, an app) where it is.
+
+[`scripts/check.sh`](skills/vernacular/scripts/check.sh) confirms the attachment; `--durable`
+also proves it survives `git clean -xfd`, a moved repository, a worktree, a reclone, and a
+lost `~/.vern`, on a throwaway clone.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `vern init` | Attaches this repository to a new workspace; prints an optional `AGENTS.md` section for repositories you own |
+| `vern attach [ID \| DIR]` | Lists workspaces, attaches to an existing one, or re-registers a moved one |
+| `vern path working\|apparatus` | Prints the absolute path |
+| `vern status` | Shows the workspace, recent files in each space, and apparatus changes not yet committed |
+| `vern promote SRC DEST` | Copies from apparatus or working into the repository; refuses ignored destinations, and files that look like secrets or local paths unless `--allow-findings` |
+| `vern stash [--apparatus] SRC [SHELF]` | Moves a path out of the repository onto a shelf in working, or apparatus to keep it, name unchanged |
+| `vern stash --undo [ID]` | Puts the latest stash back, or the one with that ID |
 
 ```sh
-mkdir -p ~/.claude/skills && ln -s "$PWD/skills/vernacular" ~/.claude/skills/vernacular
-```
-
-Sandboxed harnesses also need access to `~/.vern`, once per machine:
-
-- Claude Code: `"permissions": {"additionalDirectories": ["/Users/you/.vern"]}` in
-  `~/.claude/settings.json`.
-- Codex: `writable_roots = ["/Users/you/.vern"]` under `[sandbox_workspace_write]` in
-  `~/.codex/config.toml`.
-- Antigravity CLI: `--add-dir ~/.vern`.
-
-Removing the skill is deleting the link.
-
-## Use
-
-```sh
-cd my-project
-vern init                 # attach this repository to a new workspace
-vern path working         # absolute path for scratch
-vern path apparatus       # absolute path for durable non-canonical work
-vern status               # workspace, spaces, and what exists outside canon
-vern stash run.log logs   # move run.log out of the repository onto the "logs" shelf in working
+vern stash run.log logs                # onto the "logs" shelf in working
 vern stash --apparatus PLAN.md plans   # keep it: onto the "plans" shelf in apparatus
 vern promote "$(vern path apparatus)/notes/design.md" docs/design.md
 ```
 
-`vern status` lists the most recently changed files in apparatus and working, so one command
-shows an agent (or you) what is there.
+`vern stash` is the exception, not the routine: once agents write to the workspace, little lands
+in the repository by mistake. It is for adoption, a misfire, or a note that became worth keeping
+but not publishing. Each stash gets an ID and a line in the workspace's `stash.jsonl`; an undo
+marks its line rather than deleting it, so the journal keeps the whole trail.
 
-`vern init` also prints an optional `AGENTS.md` section for repositories you own and want to
-describe themselves to agents without the skill.
-
-`vern promote` copies from apparatus or working into canon. It never overwrites, stages, or
-commits; it refuses destinations the repository ignores, and refuses files that look like
-secrets or local paths unless `--allow-findings` is given.
-
-Once agents write to the workspace, little lands in the repository by mistake; `vern stash` is
-for what does — an adoption, a misfire, a note that became worth keeping but not publishing.
-It is the opposite of promote: it moves a path out of the repository onto a shelf (a top-level
-folder) in working, or in apparatus with `--apparatus` for material worth keeping, keeping its
-name. It never overwrites and refuses tracked paths unless `--tracked` is given. Each stash gets
-an ID and a line in the workspace's `stash.jsonl`, a journal of what left the repository;
-`vern stash --undo` puts the latest one back (repeat it to go further back), and
-`vern stash --undo ID` puts back a specific one. An undo marks its line `undone_at` rather than
-deleting it.
+Run `vern help` for details.
 
 ## History
 
-Apparatus is its own Git repository, separate from the project's, so kept material can always
-be recovered: `vern init` creates it (and adds it to existing workspaces), `vern stash
---apparatus` commits each move with the project commit it came from, and `vern status` shows
-changes not yet recorded. vern's own commits work without any Git setup: they skip signing and
-use a `vern` identity if you have none, without changing the repository's config. It is local;
-nothing is pushed.
-Working has no history, by design: it is scratch. An apparatus path you point somewhere else
-(a notes folder, a shared clone) is left for you to version.
+- **Apparatus is its own Git repository**, separate from the project's. `vern init` creates
+  it, and adds it to existing workspaces.
+- `vern stash --apparatus` commits each move with the project commit it came from; agents commit
+  what they write there; `vern status` shows anything not yet committed.
+- vern's own commits need no Git setup: they skip signing and use a `vern` identity if you have
+  none, without changing the repository's config.
+- Local only; nothing is pushed.
+- **Working has no history**, by design: it is scratch.
+- An apparatus path you point elsewhere (a notes folder, a shared clone) is yours to version.
 
 ## Attachment
 
@@ -133,8 +142,6 @@ vern attach vrn_1a2b3c4d                # attach this repository to an existing 
 vern attach ~/.vern/data/vrn_1a2b3c4d   # re-register a moved workspace, or a lost ~/.vern
 git config --unset vernacular.workspace # detach
 ```
-
-Run `vern help` for the full command surface.
 
 ## Contributing
 
