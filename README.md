@@ -135,7 +135,7 @@ lost `~/.vern`, on a throwaway clone.
 
 | Command | Does |
 |---|---|
-| `vern init` | Attaches this repository to a new workspace; prints an optional `AGENTS.md` section for repositories you own |
+| `vern init` | Attaches this repository to a new workspace |
 | `vern attach [ID \| DIR]` | Lists workspaces, attaches to an existing one, or re-registers a moved one |
 | `vern path working\|apparatus` | Prints the absolute path |
 | `vern status` | Shows the workspace, recent files in each space, and apparatus changes not yet committed |

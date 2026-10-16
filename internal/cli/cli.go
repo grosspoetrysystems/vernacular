@@ -168,7 +168,6 @@ func runInit(args []string, stdout io.Writer) error {
 	_, _ = fmt.Fprintf(stdout, "\napparatus keeps its own Git history: vern and your agent save to it and say so when they do.\n")
 	printSaved(stdout, res.Saved)
 	_, _ = fmt.Fprintf(stdout, "\nNext: ask your agent to \"set up Vernacular\". It offers to move notes, plans, and\nresearch you already keep in this repository into the workspace.\n")
-	_, _ = fmt.Fprintf(stdout, "\nOptional: add this to the repository's AGENTS.md (or CLAUDE.md):\n\n%s", agentSnippet)
 	return nil
 }
 
@@ -244,25 +243,6 @@ func printSpaces(w io.Writer, ws *workspace.Workspace) {
 	_, _ = fmt.Fprintf(w, "  canon      %s\n  apparatus  %s\n  working    %s\n",
 		workspace.Abbrev(ws.Canon), workspace.Abbrev(ws.Apparatus), workspace.Abbrev(ws.Working))
 }
-
-// agentSnippet carries no paths: workspace locations are private and machine-specific.
-const agentSnippet = `## Vernacular workspace
-
-This repository is project canon. Its working context lives outside it:
-product documents, decisions, research, experiments, and earlier agents'
-reports. Before planning work or reporting on status or direction, list
-and read what is relevant under ` + "`vern path apparatus`" + ` and ` + "`vern path working`" + `.
-
-Do not create exploratory reports, plans, research, benchmark output,
-or temporary Markdown in this repository unless explicitly requested.
-
-For temporary research, generated reports, and scratch files, write under
-the path printed by ` + "`vern path working`" + `.
-For durable non-canonical work, use ` + "`vern path apparatus`" + `.
-
-Only move material into this repository through an intentional
-project change, such as ` + "`vern promote`" + `.
-`
 
 func runStatus(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
