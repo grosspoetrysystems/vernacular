@@ -12,7 +12,8 @@ import (
 // InitResult reports what Init did.
 type InitResult struct {
 	Workspace *Workspace
-	Existing  bool // the checkout was already attached
+	Existing  bool   // the checkout was already attached
+	Saved     string // apparatus history's first save point, when Init started it
 }
 
 // Init attaches the checkout containing repoDir to a new workspace in ~/.vern/data/ID, or, when
@@ -27,10 +28,11 @@ func Init(repoDir string) (*InitResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := ws.keepHistory(); err != nil {
+		saved, err := ws.keepHistory()
+		if err != nil {
 			return nil, fmt.Errorf("apparatus history: %w", err)
 		}
-		return &InitResult{Workspace: ws, Existing: true}, ws.seen(top)
+		return &InitResult{Workspace: ws, Existing: true, Saved: saved}, ws.seen(top)
 	}
 
 	home, err := Home()
@@ -65,13 +67,14 @@ func Init(repoDir string) (*InitResult, error) {
 	if err := ws.register(); err != nil {
 		return nil, err
 	}
-	if err := ws.keepHistory(); err != nil {
+	saved, err := ws.keepHistory()
+	if err != nil {
 		return nil, fmt.Errorf("apparatus history: %w", err)
 	}
 	if _, err := Git(top, "config", "--local", LinkKey, id); err != nil {
 		return nil, err
 	}
-	return &InitResult{Workspace: ws}, nil
+	return &InitResult{Workspace: ws, Saved: saved}, nil
 }
 
 // Attach attaches the checkout containing repoDir to an existing workspace, named by its ID or
@@ -100,7 +103,7 @@ func Attach(repoDir, target string) (ws *Workspace, previous string, err error) 
 			return nil, "", err
 		}
 	}
-	if err := ws.keepHistory(); err != nil {
+	if _, err := ws.keepHistory(); err != nil {
 		return nil, "", fmt.Errorf("apparatus history: %w", err)
 	}
 	return ws, previous, ws.seen(top)

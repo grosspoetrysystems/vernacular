@@ -126,15 +126,12 @@ func TestRecoveryThroughAttachDir(t *testing.T) {
 	repo := newRepo(t, "app", true)
 	ws := mustInit(t, repo)
 
-	// Lost registry: the data directory still describes itself.
+	// Lost registry: the data directory is in its default place, so vern relinks it.
 	if err := os.RemoveAll(filepath.Join(home, "workspaces")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Find(repo); err == nil || !strings.Contains(err.Error(), "vern attach DIR") {
-		t.Fatalf("Find with lost registry: err = %v", err)
-	}
-	if _, _, err := Attach(repo, ws.Root); err != nil {
-		t.Fatal(err)
+	if got, err := Find(repo); err != nil || got.Root != ws.Root {
+		t.Fatalf("Find with lost registry = %+v, %v", got, err)
 	}
 
 	// Moved data directory: the stale pointer explains itself; attach DIR repoints it.
@@ -236,6 +233,9 @@ func TestPromote(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(ws.Apparatus, "research", "parser.md")); err != nil {
 			t.Errorf("source should remain after promotion: %v", err)
+		}
+		if staged := run(t, repo, "diff", "--cached", "--name-only"); staged != "" {
+			t.Errorf("promote staged %q", staged)
 		}
 	})
 
@@ -504,4 +504,89 @@ func TestPromoteScanBlocksSecretsAndLocalPaths(t *testing.T) {
 	if err := p.Apply(true); err != nil {
 		t.Errorf("Apply with allowFindings: %v", err)
 	}
+}
+
+func TestLookupRelinksAWorkspaceInItsDefaultPlace(t *testing.T) {
+	home := isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	pointer := filepath.Join(home, "workspaces", ws.ID())
+	for name, damage := range map[string]func() error{
+		"pointer names a missing directory": func() error { return os.WriteFile(pointer, []byte("/nowhere\n"), 0o600) },
+		"pointer missing":                   func() error { return os.Remove(pointer) },
+	} {
+		if err := damage(); err != nil {
+			t.Fatal(err)
+		}
+		got, err := Find(repo)
+		if err != nil || got.Root != ws.Root {
+			t.Fatalf("%s: Find = %+v, %v", name, got, err)
+		}
+		if data, _ := os.ReadFile(pointer); strings.TrimSpace(string(data)) != ws.Root {
+			t.Errorf("%s: pointer not repaired: %q", name, data)
+		}
+	}
+}
+
+func TestBurn(t *testing.T) {
+	home := isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	write(t, filepath.Join(ws.Apparatus, "plan.md"), "keep\n")
+	b, err := PlanBurn(repo)
+	if err != nil || b.Gone || b.Apparatus.Files != 1 || b.Unsaved != 1 {
+		t.Fatalf("plan = %+v, %v", b, err)
+	}
+	if err := b.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ws.Root); !os.IsNotExist(err) {
+		t.Errorf("workspace directory survived: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "workspaces", ws.ID())); !os.IsNotExist(err) {
+		t.Errorf("registry pointer survived: %v", err)
+	}
+	if id, _ := readLink(repo); id != "" {
+		t.Errorf("link survived: %s", id)
+	}
+	if st := run(t, repo, "status", "--porcelain"); st != "" {
+		t.Errorf("burn touched the repository: %q", st)
+	}
+
+	t.Run("leftovers of a hand-deleted workspace", func(t *testing.T) {
+		ws := mustInit(t, repo)
+		if err := os.RemoveAll(ws.Root); err != nil {
+			t.Fatal(err)
+		}
+		b, err := PlanBurn(repo)
+		if err != nil || !b.Gone {
+			t.Fatalf("plan = %+v, %v", b, err)
+		}
+		if err := b.Apply(); err != nil {
+			t.Fatal(err)
+		}
+		if id, _ := readLink(repo); id != "" {
+			t.Errorf("link survived: %s", id)
+		}
+	})
+
+	t.Run("an apparatus the human chose is kept", func(t *testing.T) {
+		ws := mustInit(t, repo)
+		mine := filepath.Join(t.TempDir(), "notes")
+		write(t, filepath.Join(mine, "a.md"), "x\n")
+		ws.Manifest.Spaces.Apparatus.Path = mine
+		if err := ws.save(); err != nil {
+			t.Fatal(err)
+		}
+		b, err := PlanBurn(repo)
+		if err != nil || len(b.Kept) != 1 {
+			t.Fatalf("plan = %+v, %v", b, err)
+		}
+		if err := b.Apply(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(mine, "a.md")); err != nil {
+			t.Errorf("burn deleted a chosen apparatus: %v", err)
+		}
+	})
 }
