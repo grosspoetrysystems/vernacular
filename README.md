@@ -19,14 +19,18 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
 
 - **No trace in the repository.** One line of local Git config. No tracked file, ignore rule,
   hook, or commit, so nothing reaches patches or pull requests.
+- **Your project speaks its own language.** Material that becomes part of the project arrives
+  as ordinary work, committed by you in your project's style; Vernacular's vocabulary stays in
+  the workspace.
 - **Out of Git's reach.** Apparatus and working live outside the repository; `git clean -xfd`
   and anything else Git does there cannot touch them.
 - **Never overwrites.** `promote`, `stash`, and `stash --undo` refuse a destination that exists.
 - **Your project's history changes only on purpose.** Tracked files move only with `--tracked`;
   `promote` copies in and never stages or commits.
 - **Every move can be undone.** `stash` prints its undo; adoption writes one.
-- **Kept material has history.** vern commits what it moves into apparatus; anything else
-  there shows in `vern status` until it is committed.
+- **Kept material has save points, and you hear about them.** vern saves what it moves into
+  apparatus and prints the save; agents save what they write there and tell you in one line;
+  anything unsaved shows in `vern status`.
 - **The attachment survives** a moved repository, worktrees, a reclone, and a lost `~/.vern`.
 - **No setup, no network.** Works without a Git identity or signing setup; vern never pushes or
   fetches.
@@ -122,9 +126,12 @@ Run `vern help` for details.
 
 - **Apparatus is its own Git repository**, separate from the project's. `vern init` creates
   it, and adds it to existing workspaces.
-- `vern stash --apparatus` commits each move with the project commit it came from; agents commit
-  what they write there; `vern status` shows anything not yet committed.
-- vern's own commits need no Git setup: they skip signing and use a `vern` identity if you have
+- Commits there are save points, not a chronology: `vern stash --apparatus` saves each move
+  and names the project commit it came from; agents save each piece of work they keep; both
+  say so when they do. At the start of a session, an agent saves anything left unsaved.
+- That history is private, so its messages can be as terse or idiosyncratic as is useful to
+  you; nothing in it reaches the project.
+- vern's own saves need no Git setup: they skip signing and use a `vern` identity if you have
   none, without changing the repository's config.
 - Local only; nothing is pushed.
 - **Working has no history**, by design: it is scratch.

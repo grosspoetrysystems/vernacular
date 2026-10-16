@@ -160,10 +160,13 @@ func runInit(args []string, stdout io.Writer) error {
 	ws := res.Workspace
 	if res.Existing {
 		_, _ = fmt.Fprintf(stdout, "Already attached to %s at %s\n", ws.ID(), workspace.Abbrev(ws.Root))
+		printSaved(stdout, res.Saved)
 		return nil
 	}
 	_, _ = fmt.Fprintf(stdout, "Created workspace %s at %s\n", ws.ID(), workspace.Abbrev(ws.Root))
 	printSpaces(stdout, ws)
+	_, _ = fmt.Fprintf(stdout, "\napparatus keeps its own Git history: vern and your agent save to it and say so when they do.\n")
+	printSaved(stdout, res.Saved)
 	_, _ = fmt.Fprintf(stdout, "\nNext: ask your agent to \"set up Vernacular\". It offers to move notes, plans, and\nresearch you already keep in this repository into the workspace.\n")
 	_, _ = fmt.Fprintf(stdout, "\nOptional: add this to the repository's AGENTS.md (or CLAUDE.md):\n\n%s", agentSnippet)
 	return nil
@@ -430,10 +433,18 @@ func runStash(args []string, stdout io.Writer) error {
 		}
 		_, _ = fmt.Fprintf(stdout, "Stashed %s (%s)\n     → %s\nUndo: vern stash --undo %s\n", workspace.Display(st.From), st.ID, workspace.Display(st.To), st.ID)
 	}
+	printSaved(stdout, st.Saved)
 	if st.Warn != nil {
 		_, _ = fmt.Fprintf(stdout, "Moved, but not fully recorded: %v\n", st.Warn)
 	}
 	return nil
+}
+
+// printSaved names an apparatus save point vern just made.
+func printSaved(stdout io.Writer, saved string) {
+	if saved != "" {
+		_, _ = fmt.Fprintf(stdout, "Saved in apparatus history (%s).\n", saved)
+	}
 }
 
 // shellQuote single-quotes s for a POSIX shell.

@@ -30,12 +30,12 @@ type StashEntry struct {
 	UndoneAt *time.Time `json:"undone_at,omitempty"` // set when vern stash --undo moved it back
 }
 
-// Stashed is the result of a stash or its undo. Warn is set when the move succeeded but
-// recording it (in the stash log or apparatus's history) did not; the material is in place
-// either way.
+// Stashed is the result of a stash or its undo. Saved is the apparatus save point it made, if
+// any. Warn is set when the move succeeded but recording it (in the stash log or apparatus's
+// history) did not; the material is in place either way.
 type Stashed struct {
-	ID, From, To string
-	Warn         error
+	ID, From, To, Saved string
+	Warn                error
 }
 
 // Stash moves src out of the attached checkout containing it into the workspace's working, or
@@ -126,7 +126,9 @@ func Stash(src, shelf string, toApparatus, tracked bool) (Stashed, error) {
 	out := Stashed{ID: e.ID, From: s, To: dst, Warn: appendEntry(filepath.Join(ws.Root, stashLog), e)}
 	if toApparatus && ws.versioned() {
 		kept, _ := filepath.Rel(ws.Apparatus, dst)
-		out.Warn = errors.Join(out.Warn, ws.commit(kept, "Stash "+e.Path+" ("+e.ID+")"+ref))
+		var err error
+		out.Saved, err = ws.commit(kept, "Stash "+e.Path+" ("+e.ID+")"+ref)
+		out.Warn = errors.Join(out.Warn, err)
 	}
 	return out, nil
 }
@@ -180,7 +182,9 @@ func Unstash(dir, id string) (Stashed, error) {
 	out := Stashed{ID: e.ID, From: from, To: to, Warn: writeEntries(logPath, entries)}
 	if within(ws.Apparatus, from) && ws.versioned() {
 		kept, _ := filepath.Rel(ws.Apparatus, from)
-		out.Warn = errors.Join(out.Warn, ws.commit(kept, "Unstash "+e.Path+" ("+e.ID+")"+canonRef(ws.Canon)))
+		var err error
+		out.Saved, err = ws.commit(kept, "Unstash "+e.Path+" ("+e.ID+")"+canonRef(ws.Canon))
+		out.Warn = errors.Join(out.Warn, err)
 	}
 	return out, nil
 }
