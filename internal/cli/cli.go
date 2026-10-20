@@ -84,6 +84,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprint(stderr, usage)
 		return 2
 	}
+	workspace.Notice = func(msg string) { _, _ = fmt.Fprintln(stderr, msg) }
 	var err error
 	switch args[0] {
 	case "init":

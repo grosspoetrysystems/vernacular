@@ -73,8 +73,8 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
   yes, and one Enter answers.
 - **Leaving is your choice.** Unset the config line and the workspace stays behind as ordinary
   files; `vern burn` deletes it and everything vern recorded about it, after you type its ID.
-- **vern repairs itself.** A workspace in its default place is found again even if its
-  registry entry is lost or stale.
+- **vern repairs itself, and says so.** A workspace in its default place is found again even
+  if its registry entry is lost or stale; vern prints the repair.
 
 ## Get started
 

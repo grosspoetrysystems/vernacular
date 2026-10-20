@@ -518,12 +518,18 @@ func TestLookupRelinksAWorkspaceInItsDefaultPlace(t *testing.T) {
 		if err := damage(); err != nil {
 			t.Fatal(err)
 		}
+		var notices []string
+		Notice = func(m string) { notices = append(notices, m) }
 		got, err := Find(repo)
+		Notice = func(string) {}
 		if err != nil || got.Root != ws.Root {
 			t.Fatalf("%s: Find = %+v, %v", name, got, err)
 		}
 		if data, _ := os.ReadFile(pointer); strings.TrimSpace(string(data)) != ws.Root {
 			t.Errorf("%s: pointer not repaired: %q", name, data)
+		}
+		if len(notices) != 1 || !strings.Contains(notices[0], "relinked "+ws.ID()) {
+			t.Errorf("%s: relink not announced: %q", name, notices)
 		}
 	}
 }

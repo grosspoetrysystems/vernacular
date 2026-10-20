@@ -121,9 +121,14 @@ func loadID(id, canon string) (*Workspace, error) {
 	return ws, nil
 }
 
+// Notice receives one-line messages about repairs vern made on its own. The CLI points it at
+// stderr so a repair never goes unnoticed and never mixes into output scripts read.
+var Notice = func(string) {}
+
 // lookup reads the registry pointer for id. A missing pointer, or one naming a directory that no
 // longer holds the workspace, is repaired when the workspace is in its default place,
-// ~/.vern/data/ID: vern relinks itself instead of asking the human to.
+// ~/.vern/data/ID, and the repair is announced: a pointer to an unmounted drive must not
+// silently switch to an older copy.
 func lookup(id string) (string, error) {
 	if !validID.MatchString(id) {
 		return "", fmt.Errorf("invalid workspace id %q", id)
@@ -143,6 +148,11 @@ func lookup(id string) (string, error) {
 		}
 	}
 	if ws, lerr := Load(filepath.Join(home, "data", id)); lerr == nil && ws.ID() == id {
+		if root != "" {
+			Notice(fmt.Sprintf("vern: relinked %s to %s; it was registered at %s, which is gone. If that is an unmounted drive, mount it and run vern attach %s", id, Display(ws.Root), Display(root), Display(root)))
+		} else {
+			Notice(fmt.Sprintf("vern: relinked %s to %s; its registry entry was missing", id, Display(ws.Root)))
+		}
 		return ws.Root, ws.register()
 	}
 	if errors.Is(err, fs.ErrNotExist) {
