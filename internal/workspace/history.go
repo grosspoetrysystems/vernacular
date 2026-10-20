@@ -22,34 +22,38 @@ func (ws *Workspace) versioned() bool {
 }
 
 // keepHistory makes a default-placed apparatus its own Git repository, so stashed and compacted
-// material can always be recovered, and commits whatever is already there. Apparatus paths the
-// human chose are theirs to version.
-func (ws *Workspace) keepHistory() error {
+// material can always be recovered, and commits whatever is already there. It returns that save
+// point ("" when apparatus already had history or nothing to save). Apparatus paths the human
+// chose are theirs to version.
+func (ws *Workspace) keepHistory() (string, error) {
 	if ws.Apparatus != filepath.Join(ws.Root, "apparatus") || ws.versioned() {
-		return nil
+		return "", nil
 	}
 	if _, err := Git(ws.Apparatus, "init", "-q"); err != nil {
-		return err
+		return "", err
 	}
 	return ws.commit(".", "Start apparatus history")
 }
 
-// commit records rel (relative to apparatus) in apparatus's history. Nothing to record is not an
-// error. vern's own commits never sign, so a signing setup cannot block or hang them, and fall
-// back to a vern identity when the human has none; the repository's config is left as it is.
-func (ws *Workspace) commit(rel, message string) error {
+// commit saves rel (relative to apparatus) in apparatus's history and returns the save point's
+// short commit, or "" when there was nothing to save. vern's own commits never sign, so a signing
+// setup cannot block or hang them, and fall back to a vern identity when the human has none; the
+// repository's config is left as it is.
+func (ws *Workspace) commit(rel, message string) (string, error) {
 	if _, err := Git(ws.Apparatus, "--literal-pathspecs", "add", "-A", "--", rel); err != nil {
-		return err
+		return "", err
 	}
 	if _, err := Git(ws.Apparatus, "--literal-pathspecs", "diff", "--cached", "--quiet", "--", rel); err == nil {
-		return nil
+		return "", nil
 	}
 	args := []string{"-c", "commit.gpgsign=false"}
 	if email, _ := Git(ws.Apparatus, "config", "user.email"); email == "" {
 		args = append(args, "-c", "user.name=vern", "-c", "user.email=vern@localhost")
 	}
-	_, err := Git(ws.Apparatus, append(args, "--literal-pathspecs", "commit", "-q", "-m", message, "--", rel)...)
-	return err
+	if _, err := Git(ws.Apparatus, append(args, "--literal-pathspecs", "commit", "-q", "-m", message, "--", rel)...); err != nil {
+		return "", err
+	}
+	return Git(ws.Apparatus, "rev-parse", "--short", "HEAD")
 }
 
 // Unrecorded counts apparatus paths with changes not yet in its history; ok is false when vern

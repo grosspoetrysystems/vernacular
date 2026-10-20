@@ -26,4 +26,4 @@ go test -cover ./...
 python3 tests/test_validate_pr.py
 ```
 
-Keep the CLI to `init`, `attach`, `path`, `status`, `promote`, and `stash` unless a new command has proven itself in use. Shell out to `git`; do not add a Git library.
+Keep the CLI to `init`, `attach`, `path`, `status`, `promote`, `stash`, and `burn` unless a new command has proven itself in use. Shell out to `git`; do not add a Git library.

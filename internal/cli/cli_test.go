@@ -209,7 +209,11 @@ func TestStashUndoRestoresByDefaultAndByID(t *testing.T) {
 		}
 	}
 	first := mustRun(t, "stash", "it's notes", "research")
-	mustRun(t, "stash", "--apparatus", "later")
+	kept := mustRun(t, "stash", "--apparatus", "later")
+	head, err := exec.Command("git", "-C", mustRun(t, "path", "apparatus"), "rev-parse", "--short", "HEAD").Output()
+	if err != nil || !strings.Contains(kept, "Saved in apparatus history ("+strings.TrimSpace(string(head))+")") {
+		t.Errorf("apparatus stash did not name its save point %s:\n%s", head, kept)
+	}
 	id := first[strings.Index(first, "--undo ")+len("--undo "):]
 
 	// By ID: the older stash comes back while the newer one stays put.
@@ -281,4 +285,27 @@ func TestAttachListing(t *testing.T) {
 	if !strings.Contains(out, "vrn_deadbeef  (broken:") {
 		t.Errorf("listing lacks broken entry:\n%s", out)
 	}
+}
+
+func TestBurnNeedsTheTypedID(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	root := filepath.Dir(mustRun(t, "path", "working"))
+	if r := vern(t, "yes\n", "burn"); r.code != 1 || !strings.Contains(r.errOut, "not burned") {
+		t.Fatalf("wrong answer: exit %d, %q", r.code, r.errOut)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("wrong answer deleted the workspace: %v", err)
+	}
+	id := filepath.Base(root)
+	if r := vern(t, id+"\n", "burn"); r.code != 0 || !strings.Contains(r.out, "Burned "+id) {
+		t.Fatalf("burn: exit %d\n%s%s", r.code, r.out, r.errOut)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Errorf("workspace survived: %v", err)
+	}
+	if r := vern(t, "", "status"); r.code == 0 {
+		t.Errorf("repository still attached after burn")
+	}
+	_ = repo
 }

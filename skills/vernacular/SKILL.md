@@ -25,17 +25,19 @@ install it yourself.
 
 1. `vern status` shows the workspace and what is in it. No `adoption-*.md` in
    `vern path apparatus` means adoption never ran (`vern init` was run by hand): offer it
-   once, steps 2–5 of `references/adopt.md`, then go straight back to the task.
+   once, steps 2–5 of `references/adopt.md`, then go straight back to the task. If it shows
+   changes not in apparatus history yet, save them now (step 3) before starting.
 2. Before planning or reporting, read what is relevant:
    - `vern path apparatus`: durable material — product documents, decisions,
      research, experiments.
    - `vern path working`: scratch and earlier agents' reports.
 3. Write:
    - scratch, reports, and one-off output to `vern path working`;
-   - material worth keeping to `vern path apparatus`, then record it in apparatus's own
-     Git history: `git -C "$(vern path apparatus)" add -A && git -C "$(vern path apparatus)"
-     commit -m "<what and why>"`. `vern status` says when something is not recorded yet;
-     history is how kept material survives mistakes;
+   - material worth keeping to `vern path apparatus`, then save it in apparatus's own Git
+     history: `git -C "$(vern path apparatus)" add -A && git -C "$(vern path apparatus)"
+     commit -m "<what, in a few words>"`. A save point, not a chronology: one commit per
+     piece of work. Don't ask first (it is private and local); tell the human in one line,
+     e.g. "Saved to apparatus history: GPS-361 plan";
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
    `vern promote SRC DEST`, with the human's agreement.
@@ -78,6 +80,12 @@ kinds of material found as a pick list, shelve only what was picked, finish in t
 ## Rules
 
 - Never commit, stage, or copy workspace material into the repository yourself.
+- Never run `vern burn`; only the human does, at a terminal. It deletes apparatus and its
+  history beyond recovery.
 - Workspace paths are machine-specific: never write them into tracked files.
+- What enters the repository is ordinary project work. Its commits, pull requests, and docs
+  follow the project's own conventions and style guides, and never mention Vernacular, the
+  workspace, apparatus, working, or promotion. Vernacular's vocabulary and trailers belong
+  in apparatus history only, which never goes public.
 - `vern init` changes only local Git config; it is safe in repositories you do
   not own, and leaves no trace in commits, patches, or pull requests.
