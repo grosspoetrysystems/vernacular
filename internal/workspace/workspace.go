@@ -33,9 +33,7 @@ var validID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Space is one manifest entry.
 type Space struct {
-	Path       string `yaml:"path,omitempty"`
-	Kind       string `yaml:"kind"`
-	Visibility string `yaml:"visibility,omitempty"`
+	Path string `yaml:"path,omitempty"`
 }
 
 // Manifest is the on-disk vernacular.yml.
