@@ -24,7 +24,7 @@ Usage:
   vern path canon|apparatus|working    print a space's absolute path
   vern status                          show the workspace and what exists outside canon
   vern promote [--yes] [--allow-findings] SRC DEST
-                                       copy SRC from apparatus/working to DEST in canon
+                                       copy apparatus or consume working SRC into DEST in canon
   vern stash [--apparatus] [--tracked] SRC [SHELF]
                                        move SRC out of canon onto a shelf in working
                                        (or apparatus)
@@ -52,10 +52,10 @@ recover it. Spaces you pointed outside the workspace directory are left alone.
 Run it again to clean up after a workspace directory you deleted by hand.
 
 promote works from any directory: SRC must be inside a workspace's apparatus or
-working, and DEST inside a repository attached to that workspace. It copies; it
-never overwrites, stages, or commits. It refuses destinations canon ignores,
-refuses files that look like secrets or local paths unless --allow-findings is
-given, and asks for confirmation unless --yes is given.
+working, and DEST inside a repository attached to that workspace. It removes
+working sources after copying all selected files; apparatus sources stay.
+It never overwrites, stages, or commits. It refuses files that look like secrets
+or local paths unless --allow-findings is given, and asks unless --yes is given.
 
 stash is the opposite: SRC must be inside an attached repository, and moves to
 working/SHELF/ (or apparatus/SHELF/ with --apparatus) keeping its name. It never
@@ -363,7 +363,11 @@ func runPromote(args []string, stdin io.Reader, stdout io.Writer) error {
 			return errors.New("promotion blocked by scan findings")
 		}
 	}
-	_, _ = fmt.Fprintf(stdout, "\n%s will be copied into canon. Nothing is staged or committed.\n", plural(plan.Files(), "file"))
+	effect := "copied (source retained)"
+	if plan.Move {
+		effect = "moved (working source consumed)"
+	}
+	_, _ = fmt.Fprintf(stdout, "\n%s will be %s into canon. Nothing is staged or committed.\n", plural(plan.Files(), "file"), effect)
 
 	if !*yes {
 		_, _ = fmt.Fprint(stdout, "Promote? [y/N] ")
