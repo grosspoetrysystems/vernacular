@@ -161,39 +161,106 @@ func TestPromoteArgumentHandling(t *testing.T) {
 	repo := setup(t)
 	mustRun(t, "init")
 	working := mustRun(t, "path", "working")
-	src := filepath.Join(working, "notes.md")
-	if err := os.WriteFile(src, []byte("notes\n"), 0o600); err != nil {
-		t.Fatal(err)
+	sources := []string{"a.md", "b.md", "c.md"}
+	for _, name := range sources {
+		if err := os.WriteFile(filepath.Join(working, name), []byte("notes\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for i, args := range [][]string{
-		{"promote", "--yes", src, "a/"},
-		{"promote", src, "b/", "--yes"},
-		{"promote", "-y", "--", src, "c/"},
+		{"promote", "--yes", filepath.Join(working, sources[0]), "a/"},
+		{"promote", filepath.Join(working, sources[1]), "b/", "--yes"},
+		{"promote", "-y", "--", filepath.Join(working, sources[2]), "c/"},
 	} {
 		if r := vern(t, "", args...); r.code != 0 {
 			t.Errorf("case %d %v exited %d: %s", i, args, r.code, r.errOut)
 		}
 	}
-	for _, d := range []string{"a", "b", "c"} {
-		if _, err := os.Stat(filepath.Join(repo, d, "notes.md")); err != nil {
-			t.Errorf("%s/notes.md not promoted: %v", d, err)
+	for i, d := range []string{"a", "b", "c"} {
+		if _, err := os.Stat(filepath.Join(repo, d, sources[i])); err != nil {
+			t.Errorf("%s/%s not promoted: %v", d, sources[i], err)
+		}
+		if _, err := os.Stat(filepath.Join(working, sources[i])); !os.IsNotExist(err) {
+			t.Errorf("%s source should be consumed: %v", sources[i], err)
 		}
 	}
 
+	cancelSrc := filepath.Join(working, "cancel.md")
+	if err := os.WriteFile(cancelSrc, []byte("notes\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	// After "--", --yes is a positional argument, not a flag.
-	if r := vern(t, "", "promote", "--", src, "d/", "--yes"); r.code != 2 {
+	if r := vern(t, "", "promote", "--", cancelSrc, "d/", "--yes"); r.code != 2 {
 		t.Errorf("--yes after -- should be positional; exit %d", r.code)
 	}
 
-	if r := vern(t, "n\n", "promote", src, "e/"); r.code != 1 || !strings.Contains(r.errOut, "cancelled") {
+	r := vern(t, "n\n", "promote", cancelSrc, "e/")
+	if r.code != 1 || !strings.Contains(r.errOut, "cancelled") {
 		t.Errorf("declined promote: exit %d, stderr %q", r.code, r.errOut)
+	}
+	if _, err := os.Stat(cancelSrc); err != nil {
+		t.Errorf("declined promotion should preserve source: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(repo, "e")); !os.IsNotExist(err) {
 		t.Errorf("declined promote wrote into canon: %v", err)
 	}
-	if r := vern(t, "y\n", "promote", src, "e/"); r.code != 0 {
+	if r := vern(t, "y\n", "promote", cancelSrc, "e/"); r.code != 0 {
 		t.Errorf("confirmed promote: exit %d, stderr %q", r.code, r.errOut)
+	}
+	if _, err := os.Stat(cancelSrc); !os.IsNotExist(err) {
+		t.Errorf("confirmed promotion should consume source: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "e", "cancel.md")); err != nil {
+		t.Errorf("confirmed promotion did not copy destination: %v", err)
+	}
+}
+
+func TestPromoteScanRefusalPreservesSource(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	working := mustRun(t, "path", "working")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(working, "notes.md")
+	if err := os.WriteFile(src, []byte("see "+filepath.Join(home, "secret", "plan.md")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r := vern(t, "", "promote", "--yes", src, filepath.Join(repo, "notes.md"))
+	if r.code != 1 {
+		t.Fatalf("scan refusal exit %d, stderr %q", r.code, r.errOut)
+	}
+	if _, err := os.Stat(src); err != nil {
+		t.Errorf("scan refusal should preserve source: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "notes.md")); !os.IsNotExist(err) {
+		t.Errorf("scan refusal wrote destination: %v", err)
+	}
+}
+
+func TestPromoteApparatusRetainsSource(t *testing.T) {
+	repo := setup(t)
+	mustRun(t, "init")
+	apparatus := mustRun(t, "path", "apparatus")
+	src := filepath.Join(apparatus, "notes.md")
+	want := []byte("apparatus notes\n")
+	if err := os.WriteFile(src, want, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(repo, "notes-copy")
+
+	r := vern(t, "y\n", "promote", src, dst)
+	if r.code != 0 {
+		t.Fatalf("apparatus promotion: exit %d, stderr %q", r.code, r.errOut)
+	}
+	if got, err := os.ReadFile(src); err != nil || !bytes.Equal(got, want) {
+		t.Errorf("apparatus source: got %q, %v", got, err)
+	}
+	if got, err := os.ReadFile(dst); err != nil || !bytes.Equal(got, want) {
+		t.Errorf("apparatus destination: got %q, %v", got, err)
 	}
 }
 
