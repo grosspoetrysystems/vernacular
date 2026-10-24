@@ -18,5 +18,5 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Test the contribution validator
-        run: python3 tests/test_validate_pr.py
+      - name: Test the contribution scripts
+        run: python3 -m unittest discover -s tests -v

@@ -11,34 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REQUIRED_SECTIONS = (
-    "## Human accountability",
-    "## Verification",
-    "## Risk",
-    "## AI / automation",
+REQUIRED_SECTIONS = ("Change", "Verification", "Risk")
+PLACEHOLDERS = (
+    "Closes #",
+    "Commands and results:",
+    "<commands and concise result; project CI verifies independently>",
+    "Check every area this pull request changes:",
+    "Details and mitigations:",
 )
-ORIGINS = (
-    "Human-authored",
-    "AI-assisted",
-    "Agent-authored",
-    "Authorized automation",
-)
-AGENT_ORIGINS = {"Agent-authored", "Authorized automation"}
-ATTESTATIONS = (
-    "I reviewed the complete diff.",
-    "I understand and can explain the change.",
-    "I verified the evidence below.",
-    "I have the right to submit this contribution.",
-)
-CAPABILITY_KEYS = {
-    "repository_write": bool,
-    "command_execution": bool,
-    "network": str,
-    "secrets": str,
-    "approve": bool,
-    "merge": bool,
-}
-USERNAME = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
 
 
 @dataclass(frozen=True)
@@ -81,143 +61,63 @@ def _metadata_exempt(event: dict[str, Any], mode: str, solo_maintainer_id: int) 
     return owner.get("type") == "Organization" or owner.get("id") == solo_maintainer_id
 
 
-def _checked(body: str, label: str) -> bool:
-    return re.search(rf"^- \[[xX]\] {re.escape(label)}\s*$", body, re.MULTILINE) is not None
-
-
-def _backtick_field(body: str, label: str) -> str | None:
-    match = re.search(rf"^{re.escape(label)}:\s*`([^`]+)`\s*$", body, re.IGNORECASE | re.MULTILINE)
-    return match.group(1).strip() if match else None
-
-
-def _capabilities(body: str) -> tuple[dict[str, Any] | None, Refusal | None]:
-    match = re.search(
-        r"^Capabilities:\s*\n+```json\s*\n(?P<value>\{.*?\})\s*\n```",
-        body,
-        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+def _authorized_automation(event: dict[str, Any], logins: frozenset[str]) -> bool:
+    """A maintainer-listed bot (HELICOPTER_AUTOMATION_LOGINS) on a branch of this repository."""
+    pull_request = event.get("pull_request") or {}
+    author = pull_request.get("user") or {}
+    sender = event.get("sender") or {}
+    repository_id = (event.get("repository") or {}).get("id")
+    return (
+        author.get("type") == "Bot"
+        and author.get("login") in logins
+        and sender.get("login") == author.get("login")
+        and type(repository_id) is int
+        and ((pull_request.get("base") or {}).get("repo") or {}).get("id") == repository_id
+        and ((pull_request.get("head") or {}).get("repo") or {}).get("id") == repository_id
     )
+
+
+def _section(body: str, name: str) -> str | None:
+    """Return a section's text without comments and template placeholders, or None if absent."""
+    match = re.search(rf"^## {re.escape(name)}[ \t\r]*$(?P<text>.*?)(?=^## |\Z)", body, re.MULTILINE | re.DOTALL)
     if not match:
-        return None, Refusal(
-            "REFUSE_CAPABILITIES_INVALID",
-            "Agent-authored work requires the JSON capability block from the pull request template.",
-        )
-
-    try:
-        value = json.loads(match.group("value"))
-    except json.JSONDecodeError as error:
-        return None, Refusal(
-            "REFUSE_CAPABILITIES_INVALID",
-            f"Capability JSON is invalid: {error.msg}.",
-        )
-
-    if not isinstance(value, dict):
-        return None, Refusal("REFUSE_CAPABILITIES_INVALID", "Capabilities must be a JSON object.")
-
-    invalid = [key for key, kind in CAPABILITY_KEYS.items() if type(value.get(key)) is not kind]
-    unknown = sorted(set(value) - set(CAPABILITY_KEYS))
-    if invalid or unknown:
-        details = []
-        if invalid:
-            details.append(f"missing or wrong type: {', '.join(invalid)}")
-        if unknown:
-            details.append(f"unknown: {', '.join(unknown)}")
-        return None, Refusal(
-            "REFUSE_CAPABILITIES_INVALID",
-            "Use exactly the capability fields from the template (" + "; ".join(details) + ").",
-        )
-
-    if value["network"] not in {"none", "restricted", "unrestricted"}:
-        return None, Refusal(
-            "REFUSE_CAPABILITIES_INVALID",
-            "Capability `network` must be `none`, `restricted`, or `unrestricted`.",
-        )
-
-    return value, None
+        return None
+    text = re.sub(r"<!--.*?-->", "", match.group("text"), flags=re.DOTALL)
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line and line not in PLACEHOLDERS and not line.startswith("```"))
 
 
 def validate_body(body: str) -> list[Refusal]:
     refusals: list[Refusal] = []
+    sections = {name: _section(body, name) for name in REQUIRED_SECTIONS}
 
-    missing_sections = [section for section in REQUIRED_SECTIONS if section not in body]
-    if missing_sections:
+    missing = [f"## {name}" for name, text in sections.items() if text is None]
+    if missing:
         refusals.append(
             Refusal(
                 "REFUSE_TEMPLATE_INCOMPLETE",
-                "Missing required sections: " + ", ".join(missing_sections) + ".",
+                "Missing required sections: " + ", ".join(missing) + ". Copy them from the pull request template.",
             )
         )
 
-    human = re.search(
-        rf"^Accountable contributor:\s*@(?P<user>{USERNAME})\s*$",
-        body,
-        re.IGNORECASE | re.MULTILINE,
-    )
-    if not human or human.group("user").upper() in {"YOUR_GITHUB_USERNAME", "USERNAME"}:
+    if sections["Change"] == "":
+        refusals.append(
+            Refusal("REFUSE_CHANGE_EMPTY", "Under ## Change, describe the problem, the fix, and its visible effect.")
+        )
+    if sections["Verification"] == "":
         refusals.append(
             Refusal(
-                "REFUSE_HUMAN_ACCOUNTABILITY_MISSING",
-                "Declare `Accountable contributor: @github-user` with a real username.",
+                "REFUSE_VERIFICATION_EMPTY",
+                "Under ## Verification, list the commands or steps you ran and what they showed.",
             )
         )
-
-    unchecked = [label for label in ATTESTATIONS if not _checked(body, label)]
-    if unchecked:
+    if sections["Risk"] is not None and not re.search(r"^- \[[xX]\] ", sections["Risk"], re.MULTILINE):
         refusals.append(
             Refusal(
-                "REFUSE_ACCOUNTABILITY_UNCONFIRMED",
-                "Confirm every human-accountability checkbox.",
+                "REFUSE_RISK_UNCHECKED",
+                "Under ## Risk, check every area this pull request changes, or check `None of the above`.",
             )
         )
-
-    selected_origins = [origin for origin in ORIGINS if _checked(body, origin)]
-    if len(selected_origins) != 1:
-        refusals.append(
-            Refusal(
-                "REFUSE_AGENT_ORIGIN_AMBIGUOUS",
-                "Select exactly one AI / automation origin.",
-            )
-        )
-        return refusals
-
-    if selected_origins[0] not in AGENT_ORIGINS:
-        return refusals
-
-    identity = _backtick_field(body, "Agent identity")
-    if not identity or identity.lower() == "none":
-        refusals.append(
-            Refusal(
-                "REFUSE_AGENT_IDENTITY_UNKNOWN",
-                "Agent-authored work requires a non-empty agent or bot identity.",
-            )
-        )
-
-    run_id = _backtick_field(body, "Run ID")
-    base_sha = _backtick_field(body, "Base SHA")
-    if not run_id or run_id.lower() == "none":
-        refusals.append(Refusal("REFUSE_PROVENANCE_INCOMPLETE", "Provide a non-empty immutable Run ID."))
-    if not base_sha or re.fullmatch(r"[0-9a-fA-F]{40}", base_sha) is None:
-        refusals.append(
-            Refusal("REFUSE_PROVENANCE_INCOMPLETE", "Provide the full 40-character base commit SHA.")
-        )
-
-    capabilities, capability_refusal = _capabilities(body)
-    if capability_refusal:
-        refusals.append(capability_refusal)
-    elif capabilities:
-        if capabilities["secrets"].lower() != "none":
-            refusals.append(
-                Refusal(
-                    "REFUSE_SECRET_ACCESS",
-                    "Untrusted contribution runs may not use repository or deployment secrets.",
-                )
-            )
-        if capabilities["approve"] or capabilities["merge"]:
-            refusals.append(
-                Refusal(
-                    "REFUSE_AGENT_SELF_APPROVAL",
-                    "An authoring agent may not approve or merge its own contribution.",
-                )
-            )
 
     return refusals
 
@@ -235,6 +135,11 @@ def main() -> int:
         default="",
         help="immutable numeric GitHub user ID authorized in solo mode",
     )
+    parser.add_argument(
+        "--automation-logins",
+        default="",
+        help="maintainer-authorized bot logins (HELICOPTER_AUTOMATION_LOGINS), comma or space separated",
+    )
     args = parser.parse_args()
 
     try:
@@ -251,6 +156,10 @@ def main() -> int:
     mode = args.mode if args.mode in {"solo", "contributor", "team"} else "contributor"
     if _metadata_exempt(event, mode, solo_maintainer_id):
         print(f"{mode.capitalize()}-mode metadata exemption accepted for the trusted maintainer.")
+        return 0
+
+    if _authorized_automation(event, frozenset(filter(None, re.split(r"[\s,]+", args.automation_logins)))):
+        print("Authorized automation exemption accepted. Human review is still required.")
         return 0
 
     body = (event.get("pull_request") or {}).get("body") or ""
