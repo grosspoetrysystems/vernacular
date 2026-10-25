@@ -187,6 +187,10 @@ Run `vern help` for details.
 and registers the workspace in `~/.vern/workspaces/<id>`. The attachment follows the repository
 when it moves and is shared by its worktrees.
 
+The workspace's `vernacular.yml` stores its format version, ID and space paths. The stored
+repository path is a last-seen hint; the current checkout takes precedence. `vern attach DIR`
+reads the manifest's ID, so you can recover a workspace even after renaming its folder.
+
 ```sh
 vern attach                             # list registered workspaces
 vern attach vrn_1a2b3c4d                # attach this repository to an existing workspace
