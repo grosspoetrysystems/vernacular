@@ -35,6 +35,9 @@ type Plan struct {
 	Src, Dst  string
 	Entries   []Entry
 	Findings  []Finding
+	// Move is true when the source is consumed on a successful Apply: it lives inside working,
+	// not apparatus, and holds no nested apparatus. Apparatus sources are always retained.
+	Move bool
 }
 
 // PlanPromotion validates src and dst and scans what would cross the boundary. It does not
@@ -78,7 +81,12 @@ func PlanPromotion(src, dst string) (*Plan, error) {
 		return nil, err
 	}
 
-	p := &Plan{Workspace: ws, Src: s, Dst: d}
+	p := &Plan{
+		Workspace: ws,
+		Src:       s,
+		Dst:       d,
+		Move:      within(ws.Working, s) && !within(ws.Apparatus, s) && !within(s, ws.Apparatus),
+	}
 	if !info.IsDir() {
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("%s is not a regular file", src)
@@ -157,7 +165,8 @@ func (p *Plan) Files() int {
 }
 
 // Apply copies the plan into canon. It refuses findings unless allowFindings and never overwrites.
-// Staging and committing are left to Git and the human.
+// A successful working-space promotion consumes only the planned source entries; apparatus sources
+// are retained. Staging and committing are left to Git and the human.
 func (p *Plan) Apply(allowFindings bool) error {
 	if len(p.Findings) > 0 && !allowFindings {
 		return errors.New("promotion blocked by scan findings")
@@ -175,6 +184,14 @@ func (p *Plan) Apply(allowFindings bool) error {
 		}
 		if err := copyFile(src, dst, e.Mode); err != nil {
 			return err
+		}
+	}
+	if p.Move {
+		for i := len(p.Entries) - 1; i >= 0; i-- {
+			src := filepath.Join(p.Src, p.Entries[i].Rel)
+			if err := os.Remove(src); err != nil {
+				return fmt.Errorf("destination copied to %s but source cleanup failed for %s: %w", p.Dst, p.Src, err)
+			}
 		}
 	}
 	return nil

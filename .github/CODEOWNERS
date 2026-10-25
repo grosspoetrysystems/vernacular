@@ -1,6 +1,10 @@
 # Vernacular currently has one maintainer.
 * @thekidnamedkd
 
+/.github/ @thekidnamedkd
+/scripts/ @thekidnamedkd
+/tests/ @thekidnamedkd
+/.pr_agent.toml @thekidnamedkd
 /.github/workflows/ @thekidnamedkd
 /.github/CODEOWNERS @thekidnamedkd
 /scripts/validate_pr.py @thekidnamedkd

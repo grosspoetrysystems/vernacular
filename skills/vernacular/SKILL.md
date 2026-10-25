@@ -40,7 +40,9 @@ install it yourself.
      e.g. "Saved to apparatus history: GPS-361 plan";
    - into the repository only what the task asks for as part of the project.
 4. Material that should become part of the project moves only through
-   `vern promote SRC DEST`, with the human's agreement.
+   `vern promote SRC DEST`, with the human's agreement. It consumes working sources after
+   a successful copy; apparatus sources stay in place. Don't edit the source during
+   promotion. If source cleanup fails, inspect both locations rather than rerunning blindly.
 5. Step 3 means stashing is rare: it is for material that is in the repository anyway — a
    write that missed the workspace, or something that became worth keeping but is not
    public. Asked to port one, or catching your own misfire: `vern stash PATH` puts it in

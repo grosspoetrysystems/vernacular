@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Configure Helicopter's repository mode and default-branch protection."""
+"""Configure Vernacular's contribution mode, branch protection, and security baseline."""
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -8,21 +10,31 @@ from typing import Any
 
 MODES = ("solo", "contributor", "team")
 REQUIRED_CHECKS = ("test-validator", "validate-metadata", "check", "DCO")
+TAG_RULESET = "vernacular-release-tags"
+QUEUE_LABELS = {
+    "queue:awaiting-reviewer": ("fbca04", "Waiting on a maintainer; the queue clock is running."),
+    "queue:awaiting-author": ("c5def5", "Waiting on the contributor."),
+    "queue:no-capacity": ("d4c5f9", "Paused: no maintainer capacity yet. Stays open and keeps its place."),
+    "queue:possibly-superseded": ("e4e669", "Another pull request for the same issue merged while this one waited."),
+}
 
 
-def protection(mode: str) -> dict[str, Any]:
+def protection(mode: str, extra_checks: tuple[str, ...] = ()) -> dict[str, Any]:
     reviews = mode != "solo"
     return {
         "required_status_checks": {
             "strict": True,
-            "contexts": list(REQUIRED_CHECKS),
+            "contexts": list(dict.fromkeys((*REQUIRED_CHECKS, *extra_checks))),
         },
-        "enforce_admins": False,
+        # Team mode has several maintainers, so administrators follow the same review rule.
+        # Solo and contributor modes may have one maintainer, who needs admin merge for their own work.
+        "enforce_admins": mode == "team",
         "required_pull_request_reviews": {
             "dismiss_stale_reviews": reviews,
             "require_code_owner_reviews": reviews,
             "required_approving_review_count": int(reviews),
-            "require_last_push_approval": mode == "team",
+            # Whoever pushed last can't also approve: an agent's push after approval needs fresh review.
+            "require_last_push_approval": reviews,
         },
         "restrictions": None,
         "required_linear_history": False,
@@ -31,8 +43,39 @@ def protection(mode: str) -> dict[str, Any]:
         "block_creations": False,
         "required_conversation_resolution": True,
         "lock_branch": False,
-        "allow_fork_syncing": True,
+        "allow_fork_syncing": False,
     }
+
+
+def tag_ruleset() -> dict[str, Any]:
+    """Release tags can't be moved or deleted, so a tag's release manifest stays immutable."""
+    return {
+        "name": TAG_RULESET,
+        "target": "tag",
+        "enforcement": "active",
+        "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+        "rules": [{"type": "update"}, {"type": "deletion"}],
+    }
+
+
+def baseline(repository: str) -> list[tuple[str, str, dict[str, Any] | None]]:
+    """Repository settings every mode shares, as (method, endpoint, payload) API calls."""
+    repo = f"repos/{repository}"
+    return [
+        # Workflows get a read-only token by default and can never approve pull requests.
+        ("PUT", f"{repo}/actions/permissions/workflow", {
+            "default_workflow_permissions": "read",
+            "can_approve_pull_request_reviews": False,
+        }),
+        ("PUT", f"{repo}/actions/permissions/fork-pr-contributor-approval", {"approval_policy": "first_time_contributors"}),
+        ("PUT", f"{repo}/vulnerability-alerts", None),
+        ("PUT", f"{repo}/private-vulnerability-reporting", None),
+        ("PATCH", repo, {"security_and_analysis": {
+            "secret_scanning": {"status": "enabled"},
+            "secret_scanning_push_protection": {"status": "enabled"},
+            "dependabot_security_updates": {"status": "enabled"},
+        }}),
+    ]
 
 
 def gh(*arguments: str, input_text: str | None = None) -> str:
@@ -48,74 +91,85 @@ def gh(*arguments: str, input_text: str | None = None) -> str:
     return result.stdout.strip()
 
 
-def set_variable(repository: str, name: str, value: str) -> None:
-    gh("variable", "set", name, "--body", value, "--repo", repository)
+def api(method: str, endpoint: str, payload: dict[str, Any] | None, dry_run: bool) -> None:
+    if dry_run:
+        print(f"{method} {endpoint}" + (f" {json.dumps(payload)}" if payload else ""))
+        return
+    gh("api", "--method", method, endpoint, *(["--input", "-"] if payload else []), input_text=json.dumps(payload) if payload else None)
 
 
-def configure(repository: str, mode: str) -> None:
+def configure(repository: str, mode: str, dry_run: bool = False, extra_checks: tuple[str, ...] = ()) -> None:
+    def run(*arguments: str) -> None:
+        if dry_run:
+            print("gh " + " ".join(arguments))
+        else:
+            gh(*arguments)
+
     variables = {
         item["name"]
         for item in json.loads(gh("variable", "list", "--json", "name", "--repo", repository))
     }
 
     if "HELICOPTER_SOLO_MAINTAINER_MODE" in variables:
-        gh(
-            "variable",
-            "delete",
-            "HELICOPTER_SOLO_MAINTAINER_MODE",
-            "--repo",
-            repository,
-        )
+        run("variable", "delete", "HELICOPTER_SOLO_MAINTAINER_MODE", "--repo", repository)
 
     # Disable exemptions before tightening non-solo modes.
     if mode != "solo":
-        set_variable(repository, "HELICOPTER_MODE", "contributor")
+        run("variable", "set", "HELICOPTER_MODE", "--body", "contributor", "--repo", repository)
 
-    default_branch = gh(
-        "repo",
-        "view",
-        repository,
-        "--json",
-        "defaultBranchRef",
-        "--jq",
-        ".defaultBranchRef.name",
-    )
-    gh(
-        "api",
-        "--method",
-        "PUT",
-        f"repos/{repository}/branches/{default_branch}/protection",
-        "--input",
-        "-",
-        input_text=json.dumps(protection(mode)),
-    )
+    default_branch = gh("repo", "view", repository, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
+    api("PUT", f"repos/{repository}/branches/{default_branch}/protection", protection(mode, extra_checks), dry_run)
 
     if mode == "solo":
-        maintainer_id = gh("api", "user", "--jq", ".id")
-        set_variable(repository, "HELICOPTER_SOLO_MAINTAINER_ID", maintainer_id)
+        run("variable", "set", "HELICOPTER_SOLO_MAINTAINER_ID", "--body", gh("api", "user", "--jq", ".id"), "--repo", repository)
     elif "HELICOPTER_SOLO_MAINTAINER_ID" in variables:
-        gh(
-            "variable",
-            "delete",
-            "HELICOPTER_SOLO_MAINTAINER_ID",
-            "--repo",
-            repository,
-        )
+        run("variable", "delete", "HELICOPTER_SOLO_MAINTAINER_ID", "--repo", repository)
 
-    set_variable(repository, "HELICOPTER_MODE", mode)
-    print(f"Configured {repository} for Helicopter {mode} mode on {default_branch}.")
+    run("variable", "set", "HELICOPTER_MODE", "--body", mode, "--repo", repository)
+    if "HELICOPTER_AUTOMATION_LOGINS" not in variables:
+        # Dependabot's pull requests pass admission as authorized automation. If you already
+        # set this variable, add dependabot[bot] to it yourself.
+        run("variable", "set", "HELICOPTER_AUTOMATION_LOGINS", "--body", "dependabot[bot]", "--repo", repository)
+    for name, (color, description) in QUEUE_LABELS.items():
+        run("label", "create", name, "--color", color, "--description", description, "--force", "--repo", repository)
+
+    manual = []
+    for method, endpoint, payload in baseline(repository):
+        try:
+            api(method, endpoint, payload, dry_run)
+        except SystemExit as error:
+            # Some features depend on the plan (secret scanning on private repositories, for one).
+            manual.append(f"{method} {endpoint}: {error}")
+
+    rulesets = json.loads(gh("api", f"repos/{repository}/rulesets"))
+    existing = next((ruleset["id"] for ruleset in rulesets if ruleset["name"] == TAG_RULESET), None)
+    if existing:
+        api("PUT", f"repos/{repository}/rulesets/{existing}", tag_ruleset(), dry_run)
+    else:
+        api("POST", f"repos/{repository}/rulesets", tag_ruleset(), dry_run)
+
+    print(f"{'Would configure' if dry_run else 'Configured'} {repository} for Vernacular {mode} mode on {default_branch}.")
+    for step in manual:
+        print(f"Manual step (GitHub refused, likely the plan): {step}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=MODES)
     parser.add_argument("--repo", help="OWNER/REPOSITORY; defaults to the current repository")
+    parser.add_argument("--dry-run", action="store_true", help="print every change instead of making it")
+    parser.add_argument(
+        "--extra-check",
+        action="append",
+        default=[],
+        help="another required status check, repeatable; only checks your pull request workflows always report",
+    )
     args = parser.parse_args()
 
     repository = args.repo or gh(
         "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"
     )
-    configure(repository, args.mode)
+    configure(repository, args.mode, args.dry_run, tuple(args.extra_check))
     return 0
 
 

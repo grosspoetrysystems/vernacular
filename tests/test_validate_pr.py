@@ -10,25 +10,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from configure_repository import protection
+from configure_repository import baseline, protection, tag_ruleset
 from validate_pr import validate_body
 
 SCRIPT = ROOT / "scripts" / "validate_pr.py"
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
 
 
-VALID_HUMAN = """## Change
+VALID = """## Change
 
 Small fix.
-
-## Human accountability
-
-Accountable contributor: @alice
-
-- [x] I reviewed the complete diff.
-- [x] I understand and can explain the change.
-- [x] I verified the evidence below.
-- [x] I have the right to submit this contribution.
 
 ## Verification
 
@@ -37,30 +28,6 @@ Ran the check.
 ## Risk
 
 - [x] None of the above
-
-## AI / automation
-
-- [x] Human-authored
-- [ ] AI-assisted
-- [ ] Agent-authored
-- [ ] Authorized automation
-
-Agent identity: `none`
-Run ID: `none`
-Base SHA: `none`
-
-Capabilities:
-
-```json
-{
-  "repository_write": false,
-  "command_execution": false,
-  "network": "none",
-  "secrets": "none",
-  "approve": false,
-  "merge": false
-}
-```
 """
 
 
@@ -106,78 +73,39 @@ def codes(body: str) -> set[str]:
 
 
 class ValidateBodyTests(unittest.TestCase):
-    def test_valid_human_submission_passes(self) -> None:
-        self.assertEqual(codes(VALID_HUMAN), set())
+    def test_minimal_submission_passes(self) -> None:
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline):
+                self.assertEqual(codes(VALID.replace("\n", newline)), set())
 
-    def test_accountability_must_be_real_and_confirmed(self) -> None:
-        body = VALID_HUMAN.replace("@alice", "@YOUR_GITHUB_USERNAME").replace(
-            "[x] I reviewed the complete diff.", "[ ] I reviewed the complete diff."
-        )
+    def test_each_missing_section_is_named(self) -> None:
+        for section in ("Change", "Verification", "Risk"):
+            with self.subTest(section=section):
+                body = VALID.replace(f"## {section}", "## Other")
+                refusals = validate_body(body)
+                self.assertIn("REFUSE_TEMPLATE_INCOMPLETE", {r.code for r in refusals})
+                self.assertIn(f"## {section}", " ".join(r.message for r in refusals))
+
+    def test_unfilled_template_is_refused_with_specific_fixes(self) -> None:
         self.assertEqual(
-            codes(body),
-            {"REFUSE_HUMAN_ACCOUNTABILITY_MISSING", "REFUSE_ACCOUNTABILITY_UNCONFIRMED"},
+            codes(TEMPLATE.read_text(encoding="utf-8")),
+            {"REFUSE_CHANGE_EMPTY", "REFUSE_VERIFICATION_EMPTY", "REFUSE_RISK_UNCHECKED"},
         )
 
-    def test_exactly_one_origin_is_required(self) -> None:
-        body = VALID_HUMAN.replace("[ ] AI-assisted", "[x] AI-assisted")
-        self.assertIn("REFUSE_AGENT_ORIGIN_AMBIGUOUS", codes(body))
-
-    def test_agent_submission_requires_identity_and_provenance(self) -> None:
-        body = VALID_HUMAN.replace("[x] Human-authored", "[ ] Human-authored").replace(
-            "[ ] Agent-authored", "[x] Agent-authored"
-        )
-        self.assertEqual(
-            codes(body),
-            {"REFUSE_AGENT_IDENTITY_UNKNOWN", "REFUSE_PROVENANCE_INCOMPLETE"},
-        )
-
-    def test_valid_agent_submission_passes(self) -> None:
-        body = (
-            VALID_HUMAN.replace("[x] Human-authored", "[ ] Human-authored")
-            .replace("[ ] Agent-authored", "[x] Agent-authored")
-            .replace("Agent identity: `none`", "Agent identity: `builder[bot]`")
-            .replace("Run ID: `none`", "Run ID: `run-123`")
-            .replace("Base SHA: `none`", "Base SHA: `" + "a" * 40 + "`")
-        )
-        self.assertEqual(codes(body), set())
-
-    def test_agent_cannot_claim_secrets_or_merge(self) -> None:
-        body = (
-            VALID_HUMAN.replace("[x] Human-authored", "[ ] Human-authored")
-            .replace("[ ] Agent-authored", "[x] Agent-authored")
-            .replace("Agent identity: `none`", "Agent identity: `builder[bot]`")
-            .replace("Run ID: `none`", "Run ID: `run-123`")
-            .replace("Base SHA: `none`", "Base SHA: `" + "a" * 40 + "`")
-            .replace('"secrets": "none"', '"secrets": "repository"')
-            .replace('"merge": false', '"merge": true')
-        )
-        self.assertEqual(codes(body), {"REFUSE_SECRET_ACCESS", "REFUSE_AGENT_SELF_APPROVAL"})
-
-    def test_agent_capabilities_must_match_template(self) -> None:
-        body = (
-            VALID_HUMAN.replace("[x] Human-authored", "[ ] Human-authored")
-            .replace("[ ] Agent-authored", "[x] Agent-authored")
-            .replace("Agent identity: `none`", "Agent identity: `builder[bot]`")
-            .replace("Run ID: `none`", "Run ID: `run-123`")
-            .replace("Base SHA: `none`", "Base SHA: `" + "a" * 40 + "`")
-            .replace('"network": "none"', '"network": true')
-        )
-        self.assertIn("REFUSE_CAPABILITIES_INVALID", codes(body))
-
-    def test_shipped_template_matches_validator_contract(self) -> None:
+    def test_filled_template_passes(self) -> None:
         body = (
             TEMPLATE.read_text(encoding="utf-8")
-            .replace("@YOUR_GITHUB_USERNAME", "@alice")
-            .replace("- [ ] I ", "- [x] I ")
-            .replace("- [ ] Human-authored", "- [x] Human-authored")
+            .replace("Closes #", "Fixes the queue label.\n\nCloses #12")
+            .replace("<commands and concise result; project CI verifies independently>", "unittest: 40 passed")
+            .replace("- [ ] None of the above", "- [x] None of the above")
         )
         self.assertEqual(codes(body), set())
 
+
     def test_cli_accepts_a_valid_event(self) -> None:
-        result = run_cli({"pull_request": {"body": VALID_HUMAN}})
+        result = run_cli({"pull_request": {"body": VALID}})
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Human review is still required", result.stdout)
 
     def test_solo_mode_requires_configured_maintainer(self) -> None:
         owner = owner_event()
@@ -236,11 +164,58 @@ class ValidateBodyTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
 
+class AuthorizedAutomationTests(unittest.TestCase):
+    def bot_event(self, login: str = "dependabot[bot]", head_repository_id: int = 100) -> dict[str, object]:
+        event = owner_event(author_type="Bot", sender_type="Bot", head_repository_id=head_repository_id)
+        event["pull_request"]["user"]["login"] = login
+        event["sender"]["login"] = login
+        return event
+
+    def test_listed_bot_on_a_repository_branch_is_admitted(self) -> None:
+        result = run_cli(self.bot_event(), "--automation-logins", "dependabot[bot], renovate[bot]")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_unlisted_bot_or_fork_follows_the_contract(self) -> None:
+        for event, logins in (
+            (self.bot_event(login="other[bot]"), "dependabot[bot]"),
+            (self.bot_event(head_repository_id=101), "dependabot[bot]"),
+            (self.bot_event(), ""),
+        ):
+            result = run_cli(event, "--automation-logins", logins)
+            self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_listed_login_must_be_a_bot(self) -> None:
+        event = owner_event(author_association="NONE")
+        event["pull_request"]["user"]["login"] = event["sender"]["login"] = "dependabot[bot]"
+        self.assertEqual(run_cli(event, "--automation-logins", "dependabot[bot]").returncode, 1)
+
+
 class ConfigureRepositoryTests(unittest.TestCase):
+    def test_workflows_get_read_only_tokens_and_cannot_approve(self) -> None:
+        calls = {endpoint: payload for _, endpoint, payload in baseline("o/r")}
+        self.assertEqual(
+            calls["repos/o/r/actions/permissions/workflow"],
+            {"default_workflow_permissions": "read", "can_approve_pull_request_reviews": False},
+        )
+        self.assertEqual(
+            calls["repos/o/r/actions/permissions/fork-pr-contributor-approval"],
+            {"approval_policy": "first_time_contributors"},
+        )
+
+    def test_extra_checks_are_required_alongside_the_defaults(self) -> None:
+        contexts = protection("solo", ("checks", "check"))["required_status_checks"]["contexts"]
+        self.assertEqual(contexts, ["test-validator", "validate-metadata", "check", "DCO", "checks"])
+
+    def test_release_tags_cannot_move_or_be_deleted(self) -> None:
+        ruleset = tag_ruleset()
+        self.assertEqual((ruleset["target"], ruleset["enforcement"]), ("tag", "active"))
+        self.assertEqual(ruleset["conditions"]["ref_name"]["include"], ["refs/tags/v*"])
+        self.assertEqual({rule["type"] for rule in ruleset["rules"]}, {"update", "deletion"})
+
     def test_mode_protection_presets(self) -> None:
         expected_reviews = {
             "solo": (0, False, False, False),
-            "contributor": (1, True, True, False),
+            "contributor": (1, True, True, True),
             "team": (1, True, True, True),
         }
         for mode, reviews in expected_reviews.items():
@@ -260,7 +235,7 @@ class ConfigureRepositoryTests(unittest.TestCase):
                     settings["required_status_checks"],
                     {"strict": True, "contexts": ["test-validator", "validate-metadata", "check", "DCO"]},
                 )
-                self.assertFalse(settings["enforce_admins"])
+                self.assertEqual(settings["enforce_admins"], mode == "team")
                 self.assertFalse(settings["allow_force_pushes"])
                 self.assertFalse(settings["allow_deletions"])
                 self.assertTrue(settings["required_conversation_resolution"])
