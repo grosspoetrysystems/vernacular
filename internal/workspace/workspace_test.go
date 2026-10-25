@@ -225,6 +225,9 @@ func TestPromote(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if p.Move {
+			t.Fatal("apparatus source should be retained")
+		}
 		if err := p.Apply(false); err != nil {
 			t.Fatal(err)
 		}
@@ -239,10 +242,13 @@ func TestPromote(t *testing.T) {
 		}
 	})
 
-	t.Run("directory copies recursively to new path", func(t *testing.T) {
+	t.Run("directory moves recursively to new path", func(t *testing.T) {
 		p, err := PlanPromotion(filepath.Join(ws.Working, "bench"), filepath.Join(repo, "testdata", "bench"))
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !p.Move {
+			t.Fatal("working source should be consumed")
 		}
 		if p.Files() != 2 {
 			t.Errorf("files = %d, want 2", p.Files())
@@ -250,12 +256,24 @@ func TestPromote(t *testing.T) {
 		if err := p.Apply(false); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := os.ReadFile(filepath.Join(repo, "testdata", "bench", "nested", "b.csv")); err != nil || string(got) != "c,d\n" {
-			t.Fatalf("got %q, %v", got, err)
+		for _, tc := range []struct {
+			path, want string
+		}{
+			{filepath.Join(repo, "testdata", "bench", "a.csv"), "a,b\n"},
+			{filepath.Join(repo, "testdata", "bench", "nested", "b.csv"), "c,d\n"},
+		} {
+			if got, err := os.ReadFile(tc.path); err != nil || string(got) != tc.want {
+				t.Errorf("%s: got %q, %v", tc.path, got, err)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(ws.Working, "bench")); !os.IsNotExist(err) {
+			t.Errorf("working source should be consumed: %v", err)
 		}
 	})
 
-	a := filepath.Join(ws.Working, "bench", "a.csv")
+	write(t, filepath.Join(ws.Working, "refusal.md"), "refusal\n")
+	a := filepath.Join(ws.Working, "refusal.md")
+
 	refusals := []struct {
 		name, src, dst, want string
 	}{
@@ -274,6 +292,158 @@ func TestPromote(t *testing.T) {
 				t.Errorf("err = %v, want %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestPromoteWorkingFileConsumesSource(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	src := filepath.Join(ws.Working, "notes.md")
+	write(t, src, "working notes\n")
+
+	p, err := PlanPromotion(src, filepath.Join(repo, "notes.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Move {
+		t.Fatal("working source should be consumed")
+	}
+	if err := p.Apply(false); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(filepath.Join(repo, "notes.md")); err != nil || string(got) != "working notes\n" {
+		t.Fatalf("destination: got %q, %v", got, err)
+	}
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Fatalf("source should be consumed: %v", err)
+	}
+}
+
+func TestPromoteWorkingCollisionPreservesSource(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	src := filepath.Join(ws.Working, "notes.md")
+	dst := filepath.Join(repo, "notes.md")
+	write(t, src, "working notes\n")
+
+	p, err := PlanPromotion(src, dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, dst, "existing\n")
+	if err := p.Apply(false); err == nil {
+		t.Fatal("collision unexpectedly succeeded")
+	}
+	if _, err := os.Stat(src); err != nil {
+		t.Fatalf("source after collision: %v", err)
+	}
+	if got, err := os.ReadFile(dst); err != nil || string(got) != "existing\n" {
+		t.Fatalf("destination after collision: got %q, %v", got, err)
+	}
+}
+
+func TestPromoteWorkingCopyFailurePreservesSource(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	src := filepath.Join(ws.Working, "tree")
+	dst := filepath.Join(repo, "tree")
+	a := filepath.Join(src, "a.txt")
+	z := filepath.Join(src, "z.txt")
+	write(t, a, "a\n")
+	write(t, z, "z\n")
+
+	p, err := PlanPromotion(src, dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(z); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(z, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(z, "marker.txt"), "keep\n")
+	if err := p.Apply(false); err == nil {
+		t.Fatal("copy unexpectedly succeeded through a directory source")
+	}
+	if got, err := os.ReadFile(filepath.Join(dst, "a.txt")); err != nil || string(got) != "a\n" {
+		t.Fatalf("destination after partial copy: got %q, %v", got, err)
+	}
+	if got, err := os.ReadFile(a); err != nil || string(got) != "a\n" {
+		t.Fatalf("source copied before failure: got %q, %v", got, err)
+	}
+	if got, err := os.ReadFile(filepath.Join(z, "marker.txt")); err != nil || string(got) != "keep\n" {
+		t.Fatalf("source replaced after planning: got %q, %v", got, err)
+	}
+}
+
+func TestPromoteUnplannedSourceSurvivesCleanup(t *testing.T) {
+	isolate(t)
+	repo := newRepo(t, "app", true)
+	ws := mustInit(t, repo)
+	src := filepath.Join(ws.Working, "tree")
+	dst := filepath.Join(repo, "tree")
+	write(t, filepath.Join(src, "planned.txt"), "planned\n")
+
+	p, err := PlanPromotion(src, dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(src, "added-after-plan.txt"), "keep me\n")
+	err = p.Apply(false)
+	if err == nil || !strings.Contains(err.Error(), "destination copied") ||
+		!strings.Contains(err.Error(), "source cleanup failed") ||
+		!strings.Contains(err.Error(), p.Src) || !strings.Contains(err.Error(), p.Dst) {
+		t.Fatalf("Apply error = %v, want explicit partial cleanup", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(dst, "planned.txt")); err != nil || string(got) != "planned\n" {
+		t.Fatalf("destination: got %q, %v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(src, "added-after-plan.txt")); err != nil {
+		t.Fatalf("unplanned source file: %v", err)
+	}
+}
+
+func TestPromoteNestedApparatusRetainsSource(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(root, "project")
+	if err := os.Mkdir(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, repo, "init", "-q")
+	write(t, filepath.Join(root, ManifestName), `version: 0
+spaces:
+  canon: {path: ./project}
+  apparatus: {path: ./working/container/kept}
+  working: {path: ./working}
+`)
+	src := filepath.Join(root, "working", "container")
+	write(t, filepath.Join(src, "working.md"), "working\n")
+	write(t, filepath.Join(src, "kept", "apparatus.md"), "apparatus\n")
+
+	p, err := PlanPromotion(src, filepath.Join(repo, "bundle"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Move {
+		t.Fatal("source containing apparatus should be retained")
+	}
+	if err := p.Apply(false); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		filepath.Join(src, "working.md"),
+		filepath.Join(src, "kept", "apparatus.md"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("source should remain at %s: %v", path, err)
+		}
 	}
 }
 
@@ -485,9 +655,10 @@ func TestPromoteScanBlocksSecretsAndLocalPaths(t *testing.T) {
 	repo := newRepo(t, "app", true)
 	ws := mustInit(t, repo)
 	fakeKey := "AK" + "IA" + strings.Repeat("Q", 16) // split so repository scanners ignore it
-	write(t, filepath.Join(ws.Working, "notes.md"), "fine\nsee "+filepath.Join(home, "secret", "plan.md")+"\nkey "+fakeKey+"\n")
+	src := filepath.Join(ws.Working, "notes.md")
+	write(t, src, "fine\nsee "+filepath.Join(home, "secret", "plan.md")+"\nkey "+fakeKey+"\n")
 
-	p, err := PlanPromotion(filepath.Join(ws.Working, "notes.md"), filepath.Join(repo, "notes.md"))
+	p, err := PlanPromotion(src, filepath.Join(repo, "notes.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,8 +672,14 @@ func TestPromoteScanBlocksSecretsAndLocalPaths(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "notes.md")); !os.IsNotExist(err) {
 		t.Errorf("blocked promotion wrote into canon: %v", err)
 	}
+	if _, err := os.Stat(src); err != nil {
+		t.Errorf("scan refusal should preserve source: %v", err)
+	}
 	if err := p.Apply(true); err != nil {
 		t.Errorf("Apply with allowFindings: %v", err)
+	}
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Errorf("allowed working promotion should consume source: %v", err)
 	}
 }
 

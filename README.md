@@ -60,9 +60,9 @@ What Vernacular guarantees. A change that breaks one of these is a bug.
   `git clean -xfd`, resets, and checkouts in the project cannot touch them. (Apparatus keeps
   its own, separate history; see [History](#history).)
 - **Never overwrites.** `promote`, `stash`, and `stash --undo` refuse a destination that exists.
-- **Your project's history changes only on purpose.** Tracked files move only with `--tracked`;
-  `promote` copies in and never stages or commits.
-- **Every move can be undone.** `stash` prints its undo; adoption writes one.
+- **Your project's history changes only on purpose.** Stashing tracked files requires `--tracked`;
+  `promote` brings material in but never stages or commits.
+- **Stashes can be undone.** `stash` prints its undo; adoption writes one.
 - **Kept material has save points, and you hear about them.** vern saves what it moves into
   apparatus and prints the save; agents save what they write there and tell you in one line;
   anything unsaved shows in `vern status`.
@@ -141,7 +141,7 @@ lost `~/.vern`, on a throwaway clone.
 | `vern attach [ID \| DIR]` | Lists workspaces, attaches to an existing one, or re-registers a moved one |
 | `vern path working\|apparatus` | Prints the absolute path |
 | `vern status` | Shows the workspace, recent files in each space, and apparatus changes not yet committed |
-| `vern promote SRC DEST` | Copies from apparatus or working into the repository; refuses ignored destinations, and files that look like secrets or local paths unless `--allow-findings` |
+| `vern promote SRC DEST` | Moves from working or copies from apparatus into the repository; refuses ignored destinations, and files that look like secrets or local paths unless `--allow-findings` |
 | `vern stash [--apparatus] SRC [SHELF]` | Moves a path out of the repository onto a shelf in working, or apparatus to keep it, name unchanged |
 | `vern stash --undo [ID]` | Puts the latest stash back, or the one with that ID |
 | `vern burn` | Deletes this repository's workspace, apparatus history included, its registry entry, and the link, after you type its ID; also cleans up after a workspace folder you deleted by hand |
@@ -156,6 +156,13 @@ Once agents write to the workspace, little lands in the repository by mistake, s
 rarely need `vern stash`. It covers adoption, a misfire, or a note that became worth keeping
 but not publishing. Each stash gets an ID and a line in the workspace's `stash.jsonl`; an undo
 marks its line instead of deleting it, so the journal keeps the whole trail.
+
+Promotion removes a working source only after every selected file has been copied
+successfully. Apparatus sources stay in place. The preview tells you which will happen
+before asking for confirmation. Don't edit the source during promotion.
+If copying fails, the source stays intact; the destination may contain a partial copy.
+If source cleanup fails, vern reports that the destination was copied and names the
+source it could not remove. Review both locations before deleting anything or retrying.
 
 Run `vern help` for details.
 
