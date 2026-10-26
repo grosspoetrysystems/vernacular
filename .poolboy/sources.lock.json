@@ -1,0 +1,256 @@
+{
+  "version": "0",
+  "revision": "2a7baaecdde7501bb78b8067ee31062cc6f25215",
+  "files": {
+    ".github/CODEOWNERS": {
+      "type": "other",
+      "bytes": 772,
+      "sha256": "e117ab4d2fff8f4daf58236c25936f66c100e0f5f72dcded3c7a285807167c6c"
+    },
+    ".github/ISSUE_TEMPLATE/automation-authorization.yml": {
+      "type": "yaml",
+      "bytes": 1354,
+      "sha256": "a3207abd404d21af6d79afe2b0c63255d5548e9c171def513ddd4b0f747b23a7"
+    },
+    ".github/ISSUE_TEMPLATE/bug.yml": {
+      "type": "yaml",
+      "bytes": 853,
+      "sha256": "09c06b70daa9e1f67c2a359245c4079b7e8bd7e446059b4b4410a2b6a6d296d8"
+    },
+    ".github/ISSUE_TEMPLATE/config.yml": {
+      "type": "yaml",
+      "bytes": 352,
+      "sha256": "76de60fc3eed63d244a42197601131d1de6dbfb9cf46c4a576221deca4704ecb"
+    },
+    ".github/ISSUE_TEMPLATE/proposal.yml": {
+      "type": "yaml",
+      "bytes": 1133,
+      "sha256": "dfe183ed93d86314ef1ba24bb266db37cdb127d4045565e93bffa492daae24fe"
+    },
+    ".github/dependabot.yml": {
+      "type": "yaml",
+      "bytes": 555,
+      "sha256": "e17f929110fcd2612093d326f7e84d6749991c864bfa386425525895a76681d3"
+    },
+    ".github/pull_request_template.md": {
+      "type": "markdown",
+      "bytes": 708,
+      "sha256": "9aa2ca0c3f6a243eca91134adc645a9923a7121f071587f1057b485b4bd9c861"
+    },
+    ".github/workflows/check.yml": {
+      "type": "yaml",
+      "bytes": 1402,
+      "sha256": "aab9355a0f6a08db447d24ec6deb423e2ddb0988ecf6d8006f7220bd6728380d"
+    },
+    ".github/workflows/contribution-intake.yml": {
+      "type": "yaml",
+      "bytes": 4392,
+      "sha256": "c148bcfd676a88ac94dd5e526d0d3f023acf8e2c0cbf96af4ab5adab7f2757bb"
+    },
+    ".github/workflows/contribution-policy-tests.yml": {
+      "type": "yaml",
+      "bytes": 492,
+      "sha256": "c19e223dea776062fd063234289a2068583bd0addcc7655ea85970704a3c5a59"
+    },
+    ".github/workflows/contribution-queue.yml": {
+      "type": "yaml",
+      "bytes": 1920,
+      "sha256": "8521d05fb1cc8e3d123d750ef803288ed0fe51b6101aea05a1d71fbb97f2a8b9"
+    },
+    ".github/workflows/poolboy-docs.yml": {
+      "type": "yaml",
+      "bytes": 1700,
+      "sha256": "3d35fee5cd9e8ecc73279a691a9a75bdf5d497a53ab797955927266fd5f67e2c"
+    },
+    ".github/workflows/release.yml": {
+      "type": "yaml",
+      "bytes": 6601,
+      "sha256": "9357f23975c1f6a580eac5c70d5292b485be267cd4cdc987b35781d5b2024785"
+    },
+    ".gitignore": {
+      "type": "ignore",
+      "bytes": 191,
+      "sha256": "528235bf460b287852b2fa46c881c88d1d9567f53414575459a7ddda98126c35"
+    },
+    ".golangci.yml": {
+      "type": "yaml",
+      "bytes": 360,
+      "sha256": "2409291174b37f6506a22fbb789ade9b59681134e742dc24184eb4470da36bbc"
+    },
+    ".goreleaser.yaml": {
+      "type": "yaml",
+      "bytes": 1570,
+      "sha256": "15dc5b62f88079eca2cbaa73833e07a6842bb45a1de493e1bbd9e99cc0e47958"
+    },
+    ".pr_agent.toml": {
+      "type": "toml",
+      "bytes": 2050,
+      "sha256": "dd9bd575918b00d658c2743a6d16344022760b329dac7dd9d59b38125439b3a2"
+    },
+    "AGENTS.md": {
+      "type": "markdown",
+      "bytes": 1063,
+      "sha256": "ad9bf32462d582c89c8b1062603cea8ea4c1168a966ab2793ddd68d8110e3569"
+    },
+    "CODE_OF_CONDUCT.md": {
+      "type": "markdown",
+      "bytes": 1345,
+      "sha256": "c88aa29d1524ff6c57bb52078ea1fec3fddf33604039e46ab23528cf42c3e1f6"
+    },
+    "CONTRIBUTING.md": {
+      "type": "markdown",
+      "bytes": 4883,
+      "sha256": "a61b2128708edb9a4ea9d5713012a6753515166145a028143ce605c856133458"
+    },
+    "LICENSE": {
+      "type": "other",
+      "bytes": 1080,
+      "sha256": "678563e0d0371e9ada22ca5455697bf5d96beb10699ff5b23b979fb375733f5c"
+    },
+    "MAINTAINERS.md": {
+      "type": "markdown",
+      "bytes": 10671,
+      "sha256": "0e7447535c153e185ab354c88dc2bc79fae1eab2168352baf17b85692b98485b"
+    },
+    "README.md": {
+      "type": "markdown",
+      "bytes": 11336,
+      "sha256": "b73e1c06a283aea338fbb146f78561d50b1961d0f7d8b026bfe5912ab42fae43"
+    },
+    "SECURITY.md": {
+      "type": "markdown",
+      "bytes": 1117,
+      "sha256": "4e64fc9b1db1501e73768ca4709de0f18fb34538a7e3c29a0316388ace03322a"
+    },
+    "cmd/vern/main.go": {
+      "type": "go",
+      "bytes": 255,
+      "sha256": "57169cbee78a4c6f4fea0ea2b7555a20edd68a884d5edee8ef0705f43f90c158"
+    },
+    "go.mod": {
+      "type": "other",
+      "bytes": 90,
+      "sha256": "050a9165f2d2aeaea1d3b443a0c4b3726ea273407fcac55cda1cb04a78807b04"
+    },
+    "go.sum": {
+      "type": "other",
+      "bytes": 360,
+      "sha256": "e42794fa9b56301ad073de55cac1dea683b320ed951454d8709ffc7156088dd2"
+    },
+    "internal/cli/cli.go": {
+      "type": "go",
+      "bytes": 17133,
+      "sha256": "cb6605c7c396d3b01419dd192a4ea5b79ef2c7ebf0d6ea05feba189a3efd3319"
+    },
+    "internal/cli/cli_test.go": {
+      "type": "go",
+      "bytes": 13314,
+      "sha256": "972821f592c03f5385f93b8c93e3579559e9a5f0dd24a644ab7897492c0cf236"
+    },
+    "internal/workspace/burn.go": {
+      "type": "go",
+      "bytes": 2818,
+      "sha256": "d0c224fc7bc03303950b3a4bdbf408b78405523370067bae98cb3a552de2e01f"
+    },
+    "internal/workspace/history.go": {
+      "type": "go",
+      "bytes": 2928,
+      "sha256": "cdc96dd4a7550253f24073ec1efed3bb29b3d12512d96e63f354698551aa8527"
+    },
+    "internal/workspace/init.go": {
+      "type": "go",
+      "bytes": 5239,
+      "sha256": "f2d57f22a7d9363d8fb2b1aed2ee7c9daa769c78cbb4f79c79696546d22bc5b4"
+    },
+    "internal/workspace/promote.go": {
+      "type": "go",
+      "bytes": 8059,
+      "sha256": "e8aa3d696933ae377ccb35e66eade2c585cc80fb3d3e6ada8cc702b99a89bcd5"
+    },
+    "internal/workspace/stash.go": {
+      "type": "go",
+      "bytes": 8308,
+      "sha256": "e684e04a5c860baa542a35f97ee574b052174e4e5cb9f8863fad95126e48950b"
+    },
+    "internal/workspace/status.go": {
+      "type": "go",
+      "bytes": 1368,
+      "sha256": "0b95185546f54faf601b5126244e1f4273dbbd800617838af77de481f16b9fcc"
+    },
+    "internal/workspace/workspace.go": {
+      "type": "go",
+      "bytes": 10873,
+      "sha256": "3bb8d0a73a996523c1399e7eeafaa780457c967089e418fbbd8645248c146fb2"
+    },
+    "internal/workspace/workspace_test.go": {
+      "type": "go",
+      "bytes": 26806,
+      "sha256": "1ec0d953043ff2ffc8379443467eb7e3b14b2fe9241497aaba4051880f006012"
+    },
+    "lefthook.yml": {
+      "type": "yaml",
+      "bytes": 265,
+      "sha256": "6adff89c278bb4442ce9f08d3f646d29a796984c4f7d15b92ca0a818c2924840"
+    },
+    "poolboy.toml": {
+      "type": "toml",
+      "bytes": 45,
+      "sha256": "3395cac82dcec676e148439a587d83f95f709607e97fb17d84334c864b4e4df1"
+    },
+    "scripts/commit-msg.sh": {
+      "type": "shell",
+      "bytes": 928,
+      "sha256": "e5321cd0996721f222141aff0b8d4d54e334608cb8d6c4eb7f0f90f17415702c"
+    },
+    "scripts/configure_repository.py": {
+      "type": "python",
+      "bytes": 7655,
+      "sha256": "bb81326fd9ffec8440c52908d4f0b61dd652a1ec3baf2cfb60d88c4272becab7"
+    },
+    "scripts/package-npm.mjs": {
+      "type": "javascript",
+      "bytes": 5051,
+      "sha256": "1c42c326ff3672c37cddfc6592439a0bc050dd6b3a53c275be1e4eb41fb20bf1"
+    },
+    "scripts/pr_queue.py": {
+      "type": "python",
+      "bytes": 14400,
+      "sha256": "70239c7a6e9a763f58e0f9b0a5b85424b1f6da6fdc0b9de3d2cd6f08734cd4cb"
+    },
+    "scripts/publish-npm.mjs": {
+      "type": "javascript",
+      "bytes": 1055,
+      "sha256": "3f85ca760f2341d4d6f035650b4e2ff2f811500bd61aa83c0ade9950fa6c7fc3"
+    },
+    "scripts/validate_pr.py": {
+      "type": "python",
+      "bytes": 6531,
+      "sha256": "9453cf74289c325956285e1d721495faac7de079357dff7cd3194111ac9fe660"
+    },
+    "skills/vernacular/SKILL.md": {
+      "type": "markdown",
+      "bytes": 5749,
+      "sha256": "06cfcf7c9180190669f489612fba486ce45090149dccee536807690ea1a90bb6"
+    },
+    "skills/vernacular/references/adopt.md": {
+      "type": "markdown",
+      "bytes": 12226,
+      "sha256": "24a360bb96fbab7f3ee250ef87c8722e3ac225ce355d8fadf07e3bfc95d693ec"
+    },
+    "skills/vernacular/scripts/check.sh": {
+      "type": "shell",
+      "bytes": 3934,
+      "sha256": "b9892a323895afeb988ddce0c7789384eabf91d14ab2ab0b025683d3614f0287"
+    },
+    "tests/test_ramp.py": {
+      "type": "python",
+      "bytes": 7472,
+      "sha256": "e5e55345139d8a95c589fd119a947b7d1509808244b41b83dd68285335e6d87c"
+    },
+    "tests/test_validate_pr.py": {
+      "type": "python",
+      "bytes": 10212,
+      "sha256": "af32cd7dfb953fb1b06b8408ea84349fb059be47b1965be6b994dc76e12796a7"
+    }
+  }
+}
