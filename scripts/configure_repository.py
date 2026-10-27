@@ -70,7 +70,8 @@ def baseline(repository: str) -> list[tuple[str, str, dict[str, Any] | None]]:
         ("PUT", f"{repo}/actions/permissions/fork-pr-contributor-approval", {"approval_policy": "first_time_contributors"}),
         ("PUT", f"{repo}/vulnerability-alerts", None),
         ("PUT", f"{repo}/private-vulnerability-reporting", None),
-        ("PATCH", repo, {"security_and_analysis": {
+        # Web commits (including "Apply suggestion") carry a sign-off, so admission's DCO check accepts them.
+        ("PATCH", repo, {"web_commit_signoff_required": True, "security_and_analysis": {
             "secret_scanning": {"status": "enabled"},
             "secret_scanning_push_protection": {"status": "enabled"},
             "dependabot_security_updates": {"status": "enabled"},
@@ -118,6 +119,12 @@ def configure(repository: str, mode: str, dry_run: bool = False, extra_checks: t
         run("variable", "set", "HELICOPTER_MODE", "--body", "contributor", "--repo", repository)
 
     default_branch = gh("repo", "view", repository, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
+    # Keep checks the repository already requires (its own CI, DCO): PUT replaces the whole list.
+    try:
+        current = json.loads(gh("api", f"repos/{repository}/branches/{default_branch}/protection/required_status_checks/contexts"))
+    except SystemExit:
+        current = []  # not protected yet
+    extra_checks = tuple(dict.fromkeys([*extra_checks, *(c for c in current if c not in REQUIRED_CHECKS)]))
     api("PUT", f"repos/{repository}/branches/{default_branch}/protection", protection(mode, extra_checks), dry_run)
 
     if mode == "solo":
