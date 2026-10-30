@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from configure_repository import baseline, protection, tag_ruleset
-from validate_pr import validate_body
+from validate_pr import validate_body, validate_signoff
 
 SCRIPT = ROOT / "scripts" / "validate_pr.py"
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
@@ -175,19 +175,129 @@ class AuthorizedAutomationTests(unittest.TestCase):
         result = run_cli(self.bot_event(), "--automation-logins", "dependabot[bot], renovate[bot]")
         self.assertEqual(result.returncode, 0, result.stdout)
 
-    def test_unlisted_bot_or_fork_follows_the_contract(self) -> None:
+    def test_unlisted_bot_or_fork_is_refused_even_with_a_valid_description(self) -> None:
         for event, logins in (
             (self.bot_event(login="other[bot]"), "dependabot[bot]"),
             (self.bot_event(head_repository_id=101), "dependabot[bot]"),
             (self.bot_event(), ""),
         ):
+            event["pull_request"]["body"] = VALID
             result = run_cli(event, "--automation-logins", logins)
             self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn("REFUSE_BOT_UNAUTHORIZED", result.stdout)
 
     def test_listed_login_must_be_a_bot(self) -> None:
         event = owner_event(author_association="NONE")
         event["pull_request"]["user"]["login"] = event["sender"]["login"] = "dependabot[bot]"
         self.assertEqual(run_cli(event, "--automation-logins", "dependabot[bot]").returncode, 1)
+
+
+def commit(sha: str, email: str, message: str, parents: int = 1) -> dict[str, object]:
+    return {"sha": sha, "parents": [{}] * parents, "commit": {"author": {"email": email}, "message": message}}
+
+
+class SignoffTests(unittest.TestCase):
+    def test_each_commit_needs_its_authors_signoff(self) -> None:
+        signed = commit("aaaaaaa1", "Ann@Example.com", "fix\n\nSigned-off-by: Ann <ann@example.com>\n")
+        other = commit("bbbbbbb2", "bob@example.com", "fix\n\nSigned-off-by: Ann <ann@example.com>")
+        prose = commit("ccccccc3", "cat@example.com", "says Signed-off-by: Cat <cat@example.com> inline")
+        merge = commit("ddddddd4", "web@github.com", "Merge branch main", parents=2)
+        self.assertEqual(validate_signoff([signed, merge]), [])
+        refusal, = validate_signoff([[signed, other], [prose]])  # --slurp pages
+        self.assertEqual(refusal.code, "REFUSE_SIGNOFF_MISSING")
+        self.assertIn("bbbbbbb, ccccccc", refusal.message)
+        self.assertNotIn("aaaaaaa", refusal.message)
+
+    def test_cli_checks_signoff_only_when_commits_are_given(self) -> None:
+        event = owner_event(author_association="NONE", author_id=2, sender_id=2)
+        event["pull_request"]["body"] = VALID
+        self.assertEqual(run_cli(event).returncode, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commits.json"
+            path.write_text(json.dumps([[commit("eeeeeee5", "x@example.com", "unsigned")]]), encoding="utf-8")
+            result = run_cli(event, "--commits", str(path))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_SIGNOFF_MISSING", result.stdout)
+
+
+class OpenPullRequestLimitTests(unittest.TestCase):
+    def run_with(self, association: str, open_prs: int, limit: str = "2") -> subprocess.CompletedProcess[str]:
+        event = owner_event(author_association=association, author_id=2, sender_id=2)
+        event["pull_request"]["body"] = VALID
+        return run_cli(event, "--open-prs", str(open_prs), "--open-pr-limit", limit)
+
+    def test_outside_contributors_are_held_to_the_limit(self) -> None:
+        self.assertEqual(self.run_with("NONE", 2).returncode, 0)
+        result = self.run_with("FIRST_TIME_CONTRIBUTOR", 3)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_OPEN_PR_LIMIT", result.stdout)
+
+    def test_trusted_same_repository_collaborators_and_a_zero_limit_are_exempt(self) -> None:
+        self.assertEqual(self.run_with("COLLABORATOR", 9).returncode, 0)
+        self.assertEqual(self.run_with("NONE", 9, limit="0").returncode, 0)
+
+
+class ShapeTests(unittest.TestCase):
+    def run_with(self, association: str = "NONE", *arguments: str, **pull_request: object) -> subprocess.CompletedProcess[str]:
+        head_repository_id = pull_request.pop("head_repository_id", 100)
+        event = owner_event(
+            author_association=association,
+            author_id=2,
+            sender_id=2,
+            head_repository_id=head_repository_id,
+        )
+        event["repository"]["default_branch"] = "main"
+        event["pull_request"]["base"]["ref"] = pull_request.pop("base_ref", "main")
+        event["pull_request"].update({"body": VALID, **pull_request})
+        return run_cli(event, *arguments)
+
+    def test_drafts_skip_admission(self) -> None:
+        event = owner_event(author_association="NONE", author_id=2, sender_id=2)
+        event["pull_request"]["draft"] = True
+        self.assertEqual(run_cli(event).returncode, 0)  # empty body: checked once it's ready for review
+
+    def test_outside_contributions_target_the_default_branch(self) -> None:
+        self.assertEqual(self.run_with().returncode, 0)
+        result = self.run_with(base_ref="release/1.x")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_BASE_BRANCH", result.stdout)
+        self.assertEqual(self.run_with("COLLABORATOR", base_ref="release/1.x").returncode, 0)
+
+    def test_size_limits_count_lines_and_files_and_zero_turns_them_off(self) -> None:
+        self.assertEqual(self.run_with(additions=4000, deletions=1000, changed_files=300).returncode, 0)
+        for size in ({"additions": 4000, "deletions": 1001}, {"changed_files": 301}):
+            result = self.run_with(**size)
+            self.assertEqual(result.returncode, 1, size)
+            self.assertIn("REFUSE_TOO_LARGE", result.stdout)
+        self.assertEqual(self.run_with("NONE", "--max-changed-lines", "0", additions=9999).returncode, 0)
+        self.assertEqual(self.run_with("COLLABORATOR", additions=9999).returncode, 0)
+
+    def test_associated_forks_do_not_bypass_admission_limits(self) -> None:
+        for association in ("MEMBER", "COLLABORATOR"):
+            with self.subTest(association=association):
+                result = self.run_with(
+                    association,
+                    "--open-prs",
+                    "3",
+                    head_repository_id=101,
+                    base_ref="release/1.x",
+                    additions=5001,
+                    changed_files=301,
+                )
+                self.assertEqual(result.returncode, 1, result.stdout)
+                for code in ("REFUSE_BASE_BRANCH", "REFUSE_TOO_LARGE", "REFUSE_OPEN_PR_LIMIT"):
+                    self.assertIn(code, result.stdout)
+
+    def test_same_repository_control_keeps_the_exemption(self) -> None:
+        result = self.run_with(
+            "MEMBER",
+            "--open-prs",
+            "3",
+            base_ref="release/1.x",
+            additions=5001,
+            changed_files=301,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
 
 
 class ConfigureRepositoryTests(unittest.TestCase):

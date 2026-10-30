@@ -3,6 +3,7 @@
 
 /.github/ @thekidnamedkd
 /scripts/ @thekidnamedkd
+/skills/ @thekidnamedkd
 /tests/ @thekidnamedkd
 /.pr_agent.toml @thekidnamedkd
 /.github/workflows/ @thekidnamedkd

@@ -23,6 +23,9 @@ jobs:
   validate-metadata:
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Check out validator from protected default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,15 +36,40 @@ jobs:
           sparse-checkout: scripts
           fetch-depth: 1
 
+      # Reads pull request data through the API only; nothing from the branch runs.
+      # HELICOPTER_SIGNOFF=off turns the DCO check off for projects using a CLA.
+      - name: Fetch commits and the author's open pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          gh api --paginate --slurp "repos/$REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100" > "$RUNNER_TEMP/commits.json"
+          # The live list, not search: search lags and can miss a just-opened pull request.
+          gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+            --jq ".[] | select(.user.login == \"$AUTHOR\" and (.draft | not)) | .number" | wc -l > "$RUNNER_TEMP/open_prs"
+
       - name: Validate pull request metadata
         env:
           EVENT_PATH: ${{ github.event_path }}
           HELICOPTER_AUTOMATION_LOGINS: ${{ vars.HELICOPTER_AUTOMATION_LOGINS }}
-        run: >-
-          python3 trusted-base/scripts/validate_pr.py "$EVENT_PATH"
-          --mode "$HELICOPTER_MODE"
-          --solo-maintainer-id "$HELICOPTER_SOLO_MAINTAINER_ID"
-          --automation-logins "$HELICOPTER_AUTOMATION_LOGINS"
+          HELICOPTER_SIGNOFF: ${{ vars.HELICOPTER_SIGNOFF || 'dco' }}
+          HELICOPTER_OPEN_PR_LIMIT: ${{ vars.HELICOPTER_OPEN_PR_LIMIT || '2' }}
+          HELICOPTER_MAX_CHANGED_LINES: ${{ vars.HELICOPTER_MAX_CHANGED_LINES || '5000' }}
+          HELICOPTER_MAX_CHANGED_FILES: ${{ vars.HELICOPTER_MAX_CHANGED_FILES || '300' }}
+        run: |
+          commits=()
+          if [ "$HELICOPTER_SIGNOFF" != off ]; then commits=(--commits "$RUNNER_TEMP/commits.json"); fi
+          python3 trusted-base/scripts/validate_pr.py "$EVENT_PATH" \
+            --mode "$HELICOPTER_MODE" \
+            --solo-maintainer-id "$HELICOPTER_SOLO_MAINTAINER_ID" \
+            --automation-logins "$HELICOPTER_AUTOMATION_LOGINS" \
+            "${commits[@]}" \
+            --open-prs "$(cat "$RUNNER_TEMP/open_prs")" \
+            --open-pr-limit "$HELICOPTER_OPEN_PR_LIMIT" \
+            --max-changed-lines "$HELICOPTER_MAX_CHANGED_LINES" \
+            --max-changed-files "$HELICOPTER_MAX_CHANGED_FILES"
 
       # Security invariant: no job in this privileged workflow checks out or
       # executes the pull request head. Project builds/tests belong in a separate

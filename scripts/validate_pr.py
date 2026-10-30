@@ -27,7 +27,7 @@ class Refusal:
     message: str
 
 
-def _metadata_exempt(event: dict[str, Any], mode: str, solo_maintainer_id: int) -> bool:
+def _trusted_same_repository_author(event: dict[str, Any]) -> bool:
     pull_request = event.get("pull_request") or {}
     author = pull_request.get("user") or {}
     base_repository = (pull_request.get("base") or {}).get("repo") or {}
@@ -36,8 +36,7 @@ def _metadata_exempt(event: dict[str, Any], mode: str, solo_maintainer_id: int) 
     owner = base_repository.get("owner") or {}
     sender = event.get("sender") or {}
     repository_id = repository.get("id")
-
-    trusted_same_repository_author = (
+    return (
         type(repository_id) is int
         and repository_id > 0
         and owner.get("type") in {"User", "Organization"}
@@ -49,8 +48,15 @@ def _metadata_exempt(event: dict[str, Any], mode: str, solo_maintainer_id: int) 
         and base_repository.get("id") == repository_id
         and head_repository.get("id") == repository_id
     )
-    if not trusted_same_repository_author:
+
+
+def _metadata_exempt(event: dict[str, Any], mode: str, solo_maintainer_id: int) -> bool:
+    if not _trusted_same_repository_author(event):
         return False
+
+    pull_request = event.get("pull_request") or {}
+    author = pull_request.get("user") or {}
+    owner = ((pull_request.get("base") or {}).get("repo") or {}).get("owner") or {}
 
     if mode == "team":
         return pull_request.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"}
@@ -122,6 +128,79 @@ def validate_body(body: str) -> list[Refusal]:
     return refusals
 
 
+def _commit_pages(commits: list[Any]) -> list[dict[str, Any]]:
+    """Accept the commits endpoint's array, or `gh api --paginate --slurp` pages of it."""
+    return [commit for item in commits for commit in (item if isinstance(item, list) else [item])]
+
+
+def validate_signoff(commits: list[Any]) -> list[Refusal]:
+    """Every non-merge commit carries a `Signed-off-by` with its author's email (DCO 1.1)."""
+    unsigned = []
+    for commit in _commit_pages(commits):
+        if len(commit.get("parents") or []) > 1:
+            continue  # merge commits, such as GitHub's "Update branch", carry no sign-off
+        details = commit.get("commit") or {}
+        email = ((details.get("author") or {}).get("email") or "").lower()
+        signers = re.findall(r"^Signed-off-by: .*<([^>]+)>\s*$", details.get("message") or "", re.MULTILINE | re.IGNORECASE)
+        if not email or email not in {signer.lower() for signer in signers}:
+            unsigned.append(str(commit.get("sha") or "?")[:7])
+    if not unsigned:
+        return []
+    return [
+        Refusal(
+            "REFUSE_SIGNOFF_MISSING",
+            f"Commits without a `Signed-off-by` matching their author's email: {', '.join(unsigned)}. "
+            "Run `git rebase --signoff` on your branch and force-push.",
+        )
+    ]
+
+
+def validate_open_prs(open_prs: int, limit: int) -> list[Refusal]:
+    if limit <= 0 or open_prs <= limit:
+        return []
+    return [
+        Refusal(
+            "REFUSE_OPEN_PR_LIMIT",
+            f"You have {open_prs} open non-draft pull requests here; the limit is {limit}. "
+            "Convert one to a draft or close it, then edit this description to re-run the check.",
+        )
+    ]
+
+
+def validate_shape(pull_request: dict[str, Any], default_branch: str, max_lines: int, max_files: int) -> list[Refusal]:
+    """Outside contributions target the default branch and stay small enough to review. A limit of 0 is off."""
+    refusals = []
+    base = (pull_request.get("base") or {}).get("ref")
+    if default_branch and base and base != default_branch:
+        refusals.append(
+            Refusal(
+                "REFUSE_BASE_BRANCH",
+                f"This pull request targets `{base}`; contributions go to `{default_branch}`. "
+                "Change the base branch with **Edit** next to the title.",
+            )
+        )
+    lines = (pull_request.get("additions") or 0) + (pull_request.get("deletions") or 0)
+    files = pull_request.get("changed_files") or 0
+    over = []
+    if max_lines and lines > max_lines:
+        over.append(f"{lines} changed lines (limit {max_lines})")
+    if max_files and files > max_files:
+        over.append(f"{files} changed files (limit {max_files})")
+    if over:
+        refusals.append(
+            Refusal(
+                "REFUSE_TOO_LARGE",
+                f"This pull request has {' and '.join(over)}. Split it into smaller pull requests, "
+                "or ask a maintainer in an issue first.",
+            )
+        )
+    return refusals
+
+
+def _limit(value: str, default: int) -> int:
+    return int(value) if re.fullmatch(r"[0-9]+", value) else default
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("event", type=Path, help="GitHub pull request event JSON")
@@ -140,6 +219,24 @@ def main() -> int:
         default="",
         help="maintainer-authorized bot logins (HELICOPTER_AUTOMATION_LOGINS), comma or space separated",
     )
+    parser.add_argument(
+        "--commits",
+        type=Path,
+        help="JSON from the pull request commits endpoint; checks DCO sign-off when given",
+    )
+    parser.add_argument(
+        "--open-prs",
+        type=int,
+        default=0,
+        help="the author's open non-draft pull requests in this repository, this one included",
+    )
+    parser.add_argument(
+        "--open-pr-limit",
+        default="2",
+        help="most open non-draft pull requests an outside contributor may have; 0 disables",
+    )
+    parser.add_argument("--max-changed-lines", default="5000", help="outside contributors' size limit; 0 disables")
+    parser.add_argument("--max-changed-files", default="300", help="outside contributors' file limit; 0 disables")
     args = parser.parse_args()
 
     try:
@@ -147,6 +244,10 @@ def main() -> int:
     except (OSError, json.JSONDecodeError) as error:
         print(f"REFUSE_EVENT_INVALID: {error}")
         return 2
+
+    if (event.get("pull_request") or {}).get("draft"):
+        print("Draft: admission runs when the pull request is marked ready for review.")
+        return 0
 
     if re.fullmatch(r"[1-9][0-9]*", args.solo_maintainer_id):
         solo_maintainer_id = int(args.solo_maintainer_id)
@@ -162,13 +263,35 @@ def main() -> int:
         print("Authorized automation exemption accepted. Human review is still required.")
         return 0
 
-    body = (event.get("pull_request") or {}).get("body") or ""
-    refusals = validate_body(body)
+    pull_request = event.get("pull_request") or {}
+    if (pull_request.get("user") or {}).get("type") == "Bot":
+        print(
+            "REFUSE_BOT_UNAUTHORIZED: bots need maintainer authorization before opening pull requests. "
+            "Their operator requests it with the Automation authorization issue form."
+        )
+        return 1
+
+    refusals = validate_body(pull_request.get("body") or "")
+    if args.commits:
+        try:
+            commits = json.loads(args.commits.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"REFUSE_EVENT_INVALID: commits: {error}")
+            return 2
+        refusals += validate_signoff(commits)
+    if not (
+        pull_request.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"}
+        and _trusted_same_repository_author(event)
+    ):
+        refusals += validate_open_prs(args.open_prs, _limit(args.open_pr_limit, 2))
+        default_branch = (event.get("repository") or {}).get("default_branch") or ""
+        refusals += validate_shape(
+            pull_request, default_branch, _limit(args.max_changed_lines, 5000), _limit(args.max_changed_files, 300)
+        )
     if refusals:
         print("Contribution intake refused:")
         for refusal in refusals:
             print(f"{refusal.code}: {refusal.message}")
-        print("\nUpdate the pull request description from the repository template.")
         return 1
 
     print("Contribution metadata accepted. Human review is still required.")

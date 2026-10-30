@@ -1,6 +1,6 @@
 # Contributing to Vernacular
 
-Vernacular welcomes useful, reviewable work however it was produced.
+Vernacular welcomes useful, reviewable work however it was produced. The table below lists automated checks; contribution guidance and human review still apply.
 
 ## Set up
 
@@ -16,13 +16,29 @@ python3 -m unittest discover -s tests -v
 
 Commit messages are one-line [Conventional Commits](https://www.conventionalcommits.org/) headers plus a DCO sign-off (`git commit -s`).
 
-## Your agreement
+## What's checked
+
+| Rule | Enforced by | Refusal code |
+| --- | --- | --- |
+| The description has **Change**, **Verification**, and **Risk** sections, each filled in | `validate-metadata` (required check) | `REFUSE_TEMPLATE_INCOMPLETE`, `REFUSE_CHANGE_EMPTY`, `REFUSE_VERIFICATION_EMPTY`, `REFUSE_RISK_UNCHECKED` |
+| Every commit carries `Signed-off-by` with its author's email ([DCO](#legal)); merge commits are skipped | `validate-metadata` | `REFUSE_SIGNOFF_MISSING` |
+| A bot can open pull requests only when a maintainer has listed it in `HELICOPTER_AUTOMATION_LOGINS` | `validate-metadata` | `REFUSE_BOT_UNAUTHORIZED` |
+| Outside contributors have at most two open non-draft pull requests (drafts don't count) | `validate-metadata` | `REFUSE_OPEN_PR_LIMIT` |
+| Outside contributions target the default branch | `validate-metadata` | `REFUSE_BASE_BRANCH` |
+| Outside contributions change at most 5,000 lines and 300 files per pull request | `validate-metadata` | `REFUSE_TOO_LARGE` |
+| Merging needs the required checks to pass and the reviews your mode requires; nobody can force-push or delete the default branch | Branch protection set by `configure_repository.py` | — |
+| Changes to workflows, security, dependencies, release machinery, policy, or agent instructions need the owners in `.github/CODEOWNERS` (contributor and team modes) | Branch protection (code-owner review) | — |
+| Vernacular reruns its own checks; your report of what you ran is context, not evidence | Project CI | — |
+
+For these limits, a fork is an outside contribution even when its author belongs to the organization. Exemptions apply only to trusted authors submitting from a branch in this repository.
+
+Each refusal says how to fix it. After fixing, push or edit the description to re-run the check.
 
 You agree once, not on every pull request: sign off your commits under the [Developer Certificate of Origin](#legal), which certifies that you have the right to submit the change. Pull requests carry no production or authorship declarations; reviewers judge the change, its verification, and its risk.
 
 What we expect of every contributor, however the change was produced: read the whole diff, be able to explain it, verify the evidence you report, and revise it in response to review. Using AI does not transfer those responsibilities to a tool.
 
-## AI and agent use
+## Working with us
 
 You do not need to declare how a change was produced. If a tool helped, a commit trailer it adds is welcome, for example the Linux kernel's `Assisted-by: AGENT_NAME:MODEL_VERSION`. An AI tool never adds `Signed-off-by`; only a person certifies the DCO. Never publish raw transcripts that may contain secrets, personal data, or restricted source material.
 
@@ -62,7 +78,7 @@ The pull request template has three required sections:
 
 Each pull request should solve one coherent problem. If a section is missing or empty, the admission check names it and says how to fix it.
 
-Use a draft pull request while work is incomplete. Maintainers may ask you to split unrelated, generated, mechanical, or otherwise unreviewable changes. Passing CI does not guarantee acceptance.
+Use a draft pull request while work is incomplete; admission waits until you mark it ready for review. Project CI and other checks may still run. Maintainers may ask you to split unrelated, generated, mechanical, or otherwise unreviewable changes. Passing CI does not guarantee acceptance.
 
 When you have addressed review, push your changes and reply, or press **Re-request review**. Either one hands the pull request back to a maintainer. Queue labels show whose turn it is: `queue:awaiting-author` is yours and `queue:awaiting-reviewer` is ours.
 
@@ -83,6 +99,8 @@ Signed-off-by: Your Name <your.email@example.com>
 ```
 
 A person or authorized organization, not an AI system, makes that certification. The [DCO app](https://github.com/apps/dco) supplies the required `DCO` check.
+
+The sign-off is the one agreement you make: whoever signs off answers for the change.
 
 ## Security and conduct
 

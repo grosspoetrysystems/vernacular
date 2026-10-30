@@ -2,6 +2,7 @@
 
 import sys
 import unittest
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from configure_repository import QUEUE_LABELS as PROVISIONED
-from pr_queue import LABELS as QUEUE_LABELS, SUPERSEDED, linked_issues, merged_rival, notice, plan, queued, turn
+from pr_queue import LABELS as QUEUE_LABELS, SUPERSEDED, check_superseded, linked_issues, merged_rival, notice, plan, queued, turn, update_notice
 
 NOW = datetime(2026, 10, 30, tzinfo=timezone.utc)
 
@@ -119,6 +120,13 @@ class QueueScopeTests(unittest.TestCase):
     def test_closed_pull_requests_are_never_queued(self):
         self.assertFalse(queued({**PR, "state": "closed", "author_association": "MEMBER"}, team=True))
 
+    def test_authorized_automation_is_queued_like_maintainer_work(self):
+        pr = {**PR, "state": "open", "author_association": "NONE", "user": {"login": "dependabot[bot]"}}
+        bots = frozenset({"dependabot[bot]"})
+        self.assertFalse(queued(pr, team=False, automation=bots))
+        self.assertTrue(queued(pr, team=True, automation=bots))
+        self.assertTrue(queued(pr, team=False))
+
 
 def cross_reference(number, merged_day=None, is_pr=True):
     source = {"number": number}
@@ -143,8 +151,72 @@ class SupersededTests(unittest.TestCase):
         opened_later = {**self.pr, "created_at": at(5)}
         self.assertIsNone(merged_rival(opened_later, {12: [cross_reference(61, merged_day=3)]}))
 
+    def test_flagged_pull_request_makes_no_more_lookups(self):
+        class NoCalls:
+            def request(self, *args, **kwargs):
+                raise AssertionError("no API calls once flagged")
+        flagged = {**self.pr, "labels": [{"name": SUPERSEDED}]}
+        self.assertIsNone(check_superseded(NoCalls(), flagged, [cross_reference(12, is_pr=False)]))
+
+    def test_removing_the_label_dismisses_it(self):
+        class Recorder:
+            def __init__(self):
+                self.writes = []
+            def request(self, method, path, body=None):
+                if method != "GET":
+                    self.writes.append(path)
+                    return None
+                return [cross_reference(61, merged_day=3)] if path.startswith("issues/12/timeline") else {}
+        events = [cross_reference(12, is_pr=False)]
+        first = Recorder()
+        self.assertEqual(check_superseded(first, {**self.pr, "labels": []}, events), 61)
+        self.assertEqual(first.writes, ["issues/50/labels", "issues/50/comments"])
+        posted = {"event": "commented", "actor": {"login": "github-actions[bot]"}, "body": "<!-- vernacular:superseded by=#61 -->\n..."}
+        later = Recorder()
+        self.assertIsNone(check_superseded(later, {**self.pr, "labels": []}, events + [posted]))
+        self.assertEqual(later.writes, [])
+
     def test_unmerged_rivals_and_this_pr_are_ignored(self):
         self.assertIsNone(merged_rival(self.pr, {12: [cross_reference(61), cross_reference(50, merged_day=2)]}))
+
+
+class UpdateNoticeTests(unittest.TestCase):
+    class Recorder:
+        def __init__(self, titles=()):
+            self.repository, self.titles, self.posted = "o/r", list(titles), []
+
+        def request(self, method, path, body=None):
+            if method == "GET":
+                return {"items": [{"title": title} for title in self.titles]}
+            self.posted.append(body)
+
+    def test_issues_turned_off_skips_without_failing_the_sweep(self):
+        for failed_method in ("GET", "POST"):
+            with self.subTest(method=failed_method):
+                with urllib.error.HTTPError("issues", 410, "Gone", {}, None) as error:
+                    class IssuesOff:
+                        repository = "o/r"
+
+                        def request(self, method, path, body=None):
+                            if method == failed_method:
+                                raise error
+                            return {"items": []}
+
+                    self.assertIsNone(update_notice(IssuesOff(), "v0.2.0", {"version": "v0.3.0"}))
+                    self.assertTrue(error.closed)
+
+    def test_newer_release_opens_one_issue_naming_its_action_steps(self):
+        github = self.Recorder()
+        self.assertEqual(update_notice(github, "v0.2.0", {"version": "v0.10.0", "action_required": 2}), "v0.10.0")
+        issue, = github.posted
+        self.assertEqual(issue["title"], "Helicopter v0.10.0 is available")
+        self.assertIn("2 Action required steps", issue["body"])
+
+    def test_current_or_already_notified_does_nothing(self):
+        for installed, titles in (("v0.3.0", ()), ("v0.4.0", ()), ("v0.2.0", ("Helicopter v0.3.0 is available",))):
+            github = self.Recorder(titles)
+            self.assertIsNone(update_notice(github, installed, {"version": "v0.3.0"}))
+            self.assertEqual(github.posted, [])
 
 
 class LabelTests(unittest.TestCase):
