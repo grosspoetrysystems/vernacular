@@ -47,9 +47,9 @@ func Init(repoDir string) (*InitResult, error) {
 	root := filepath.Join(home, "data", id)
 	ws := &Workspace{Root: root, Canon: top, Apparatus: filepath.Join(root, "apparatus"), Working: filepath.Join(root, "working")}
 	ws.Manifest.ID = id
-	ws.Manifest.Spaces.Canon = Space{Path: top, Kind: "canonical"}
-	ws.Manifest.Spaces.Apparatus = Space{Path: "./apparatus", Kind: "retained", Visibility: "private"}
-	ws.Manifest.Spaces.Working = Space{Path: "./working", Kind: "ephemeral", Visibility: "private"}
+	ws.Manifest.Spaces.Canon = Space{Path: top}
+	ws.Manifest.Spaces.Apparatus = Space{Path: "./apparatus"}
+	ws.Manifest.Spaces.Working = Space{Path: "./working"}
 	if err := ws.checkOverlap(); err != nil {
 		return nil, err
 	}
