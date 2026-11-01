@@ -1,13 +1,13 @@
 # Maintaining Vernacular
 
-Vernacular's contribution policy is adapted from Helicopter v0.1.0, pinned to commit `cf83ae51567cd0801484cf6ead72cf599b58423a` and recorded in the [release manifest](https://github.com/grosspoetrysystems/helicopter/releases/download/v0.1.0/helicopter.json). The policy source was adopted into this repository and adapted for Vernacular's owners, checks, dependencies, security, and release paths. These files express policy; GitHub settings enforce it.
+Vernacular's contribution policy was adopted from [Helicopter](https://github.com/grosspoetrysystems/helicopter) and adapted for Vernacular's owners, checks, dependencies, security, and release paths. The installed release is recorded in `.github/helicopter/version.json` and updated with the `helicopter` skill. These files express policy; GitHub settings enforce it.
 
 ## Activate the repository
 
 - [x] Configure the DCO sign-off check: the [DCO app](https://github.com/apps/dco) is installed on the organization, and the configurator requires its `DCO` check.
-- [ ] Decide which bot or GitHub App identities, if any, may interact with the repository. List only approved bot logins in the `HELICOPTER_AUTOMATION_LOGINS` repository variable.
+- [ ] Decide which bots or GitHub Apps, if any, may interact with the repository. A bot opens pull requests only from a branch of this repository, so its authorization is the repository write access an administrator grants; audit which GitHub Apps have write access, because their pull requests skip admission. Bot pull requests from forks are refused.
 - [ ] Review the two-PR limit and issue-first categories in `CONTRIBUTING.md`.
-- [ ] Create or replace the `needs-triage` and `automation-review` labels used by the issue forms.
+- [ ] Create or replace the `needs-triage` label used by the issue forms.
 - [ ] Test the pull request template and both acceptance/refusal paths of the intake workflow.
 - [ ] Optionally add a `HELICOPTER_REVIEW_KEY` secret with a credit limit to enable the advisory first review.
 - [ ] Keep `solo` while Vernacular has one maintainer, then switch to `contributor` or `team` when the maintainer arrangement changes. Run the configurator only after the acceptance and refusal checks pass.
@@ -19,7 +19,7 @@ Vernacular's contribution policy is adapted from Helicopter v0.1.0, pinned to co
 | --- | --- | --- | --- |
 | `solo` | One person owns or maintains the project | The configured immutable user ID on a same-repository branch | Zero required approvals |
 | `contributor` | Maintainers primarily receive outside contributions | None; every pull request follows the contribution contract | One CODEOWNER approval after the latest push |
-| `team` | An internal team builds in the open and accepts outside contributions | Same-repository `OWNER`, `MEMBER`, or `COLLABORATOR` authors | One CODEOWNER approval after the latest push; administrators included |
+| `team` | An internal team builds in the open and accepts outside contributions | Same-repository authors with repository write access | One CODEOWNER approval after the latest push; administrators included |
 
 An unset or invalid mode fails closed to `contributor`. In `team` mode, the queue also covers internal maintainer pull requests. In the other modes, it queues outside contributions only.
 
@@ -44,9 +44,9 @@ All modes:
 
 `solo` requires zero approvals because no second reviewer exists. `contributor` and `team` require one approval and CODEOWNER review; both require approval after the latest push. Required checks must have reported successfully before making them required. Do not set the mode variables at organization scope: inherited variables can affect every repository.
 
-The configurator also sets workflow permissions read-only by default, prevents workflows from approving pull requests, enables first-time-contributor approval, enables Dependabot and security settings where the plan permits, creates `queue:` labels, and sets `HELICOPTER_AUTOMATION_LOGINS=dependabot[bot]` only when that variable is unset. Review any manual-step output from GitHub rather than assuming every security feature is available on every plan.
+The configurator also sets workflow permissions read-only by default, prevents workflows from approving pull requests, enables first-time-contributor approval, enables Dependabot and security settings where the plan permits, and creates the `queue:` and `risk:` labels. Review any manual-step output from GitHub rather than assuming every security feature is available on every plan.
 
-For public repositories, set the concurrent non-draft pull-request limit for users without write access. Start at two unless maintainer capacity supports more; add trusted contributors to any bypass list deliberately.
+For public repositories, set the concurrent non-draft pull-request limit for users without write access. Start at two unless maintainer capacity supports more; grant trusted contributors repository write access deliberately.
 
 ## Protect the policy plane
 

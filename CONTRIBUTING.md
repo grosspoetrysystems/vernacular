@@ -22,15 +22,15 @@ Commit messages are one-line [Conventional Commits](https://www.conventionalcomm
 | --- | --- | --- |
 | The description has **Change**, **Verification**, and **Risk** sections, each filled in | `validate-metadata` (required check) | `REFUSE_TEMPLATE_INCOMPLETE`, `REFUSE_CHANGE_EMPTY`, `REFUSE_VERIFICATION_EMPTY`, `REFUSE_RISK_UNCHECKED` |
 | Every commit carries `Signed-off-by` with its author's email ([DCO](#legal)); merge commits are skipped | `validate-metadata` | `REFUSE_SIGNOFF_MISSING` |
-| A bot can open pull requests only when a maintainer has listed it in `HELICOPTER_AUTOMATION_LOGINS` | `validate-metadata` | `REFUSE_BOT_UNAUTHORIZED` |
-| Outside contributors have at most two open non-draft pull requests (drafts don't count) | `validate-metadata` | `REFUSE_OPEN_PR_LIMIT` |
-| Outside contributions target the default branch | `validate-metadata` | `REFUSE_BASE_BRANCH` |
-| Outside contributions change at most 5,000 lines and 300 files per pull request | `validate-metadata` | `REFUSE_TOO_LARGE` |
+| A bot opens pull requests only from a branch of this repository, which needs write access an administrator grants | `validate-metadata` | `REFUSE_BOT_UNAUTHORIZED` |
+| Contributors without write access have at most two open non-draft pull requests (drafts don't count) | `validate-metadata` | `REFUSE_OPEN_PR_LIMIT` |
+| Contributors without write access target the default branch | `validate-metadata` | `REFUSE_BASE_BRANCH` |
+| Contributors without write access change at most 5,000 lines and 300 files per pull request | `validate-metadata` | `REFUSE_TOO_LARGE` |
 | Merging needs the required checks to pass and the reviews your mode requires; nobody can force-push or delete the default branch | Branch protection set by `configure_repository.py` | — |
 | Changes to workflows, security, dependencies, release machinery, policy, or agent instructions need the owners in `.github/CODEOWNERS` (contributor and team modes) | Branch protection (code-owner review) | — |
 | Vernacular reruns its own checks; your report of what you ran is context, not evidence | Project CI | — |
 
-For these limits, a fork is an outside contribution even when its author belongs to the organization. Exemptions apply only to trusted authors submitting from a branch in this repository.
+Exemptions are based on repository write permissions, not on the event's author association: a fork or an association label alone never grants an exemption. Maintainers are recognized by a live permission lookup; bots are authorized by opening a branch in this repository, which requires write access.
 
 Each refusal says how to fix it. After fixing, push or edit the description to re-run the check.
 
@@ -66,7 +66,7 @@ Open or reference an accepted issue before starting:
 
 Small bug fixes, documentation corrections, and focused maintenance may skip issue-first review unless a maintainer says otherwise.
 
-Unapproved bots and autonomous agents must not open issues, pull requests, reviews, or comments. Their operator must request authorization with the **Automation authorization** issue form before they interact with Vernacular.
+Autonomous agents work through a person's account: that person signs off the agent's pull requests, verifies them, and answers for its issues, reviews, and comments. A bot opens pull requests only from a branch of this repository, which needs write access an administrator grants; bot pull requests from forks are refused.
 
 ## Pull request contract
 

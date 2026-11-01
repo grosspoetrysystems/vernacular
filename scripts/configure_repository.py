@@ -17,7 +17,12 @@ QUEUE_LABELS = {
     "queue:no-capacity": ("d4c5f9", "Paused: no maintainer capacity yet. Stays open and keeps its place."),
     "queue:possibly-superseded": ("e4e669", "Another pull request for the same issue merged while this one waited."),
 }
-
+RISK_LABELS = {
+    "risk:dependencies": ("b60205", "Advisory: changed dependency manifests or lockfiles."),
+    "risk:automation": ("fbca04", "Advisory: changed automation, build, release, policy, or agent instructions."),
+    "risk:generated": ("d4c5f9", "Advisory: changed generated or vendored content marked in .gitattributes."),
+    "risk:large": ("e99695", "Advisory: over 1,000 changed lines or 50 files, excluding lockfiles and generated files."),
+}
 
 def protection(mode: str, extra_checks: tuple[str, ...] = ()) -> dict[str, Any]:
     reviews = mode != "solo"
@@ -133,12 +138,9 @@ def configure(repository: str, mode: str, dry_run: bool = False, extra_checks: t
         run("variable", "delete", "HELICOPTER_SOLO_MAINTAINER_ID", "--repo", repository)
 
     run("variable", "set", "HELICOPTER_MODE", "--body", mode, "--repo", repository)
-    if "HELICOPTER_AUTOMATION_LOGINS" not in variables:
-        # Dependabot's pull requests pass admission as authorized automation. If you already
-        # set this variable, add dependabot[bot] to it yourself.
-        run("variable", "set", "HELICOPTER_AUTOMATION_LOGINS", "--body", "dependabot[bot]", "--repo", repository)
-    for name, (color, description) in QUEUE_LABELS.items():
-        run("label", "create", name, "--color", color, "--description", description, "--force", "--repo", repository)
+    for labels in (QUEUE_LABELS, RISK_LABELS):
+        for name, (color, description) in labels.items():
+            run("label", "create", name, "--color", color, "--description", description, "--force", "--repo", repository)
 
     manual = []
     for method, endpoint, payload in baseline(repository):
