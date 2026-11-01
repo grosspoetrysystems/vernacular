@@ -13,14 +13,19 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
 API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 BOT = "github-actions[bot]"
-MAINTAINER = {"OWNER", "MEMBER", "COLLABORATOR"}
+# Who counts as a maintainer is answered by a live permission lookup, not by the
+# event's author_association: it can report CONTRIBUTOR for a user with repository
+# admin access, and private organization membership is not exposed by the
+# public-members endpoint. See GitHub.is_maintainer.
 LABELS = {
     "author": "queue:awaiting-author",
     "reviewer": "queue:awaiting-reviewer",
@@ -29,6 +34,10 @@ LABELS = {
 NOTICE_MARKER = "<!-- vernacular:queue {kind} since={since} -->"
 SUPERSEDED = "queue:possibly-superseded"
 SUPERSEDED_MARKER = "<!-- vernacular:superseded by=#{rival} -->"
+HELICOPTER = "grosspoetrysystems/helicopter"
+UPDATE_MARKER = "<!-- helicopter:update to={version} -->"
+# Written by the helicopter skill; the queue checks it out alongside scripts/.
+VERSION_FILE = Path(__file__).resolve().parent.parent / ".github/helicopter/version.json"
 # GitHub's linking keywords; a bare "#1" in prose is too noisy to count.
 REFERENCE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b", re.IGNORECASE)
 
@@ -48,8 +57,8 @@ def turn(
     pr: dict[str, Any],
     events: list[dict[str, Any]],
     now: datetime,
+    is_maintainer: Callable[[str], bool],
     admitted: bool | None = None,
-    ignored: frozenset[str] = frozenset(),
 ) -> Turn | None:
     """Return whose turn it is and since when, or None if the PR is not queued."""
     if pr.get("draft"):
@@ -78,12 +87,12 @@ def turn(
                 whose, since, reason = "reviewer", at, "author re-requested review"
         elif kind not in {"commented", "reviewed"}:
             continue
-        elif actor.get("type") == "Bot" or login in ignored:
+        elif actor.get("type") == "Bot":
             continue
         elif login == author:
             if whose == "author":
                 whose, since, reason = "reviewer", at, "author replied"
-        elif event.get("author_association") in MAINTAINER:
+        elif is_maintainer(login or ""):
             if event.get("state") == "changes_requested":
                 whose, since, reason = "author", at, "maintainer requested changes"
             elif whose == "reviewer" or event.get("state") == "approved":
@@ -170,6 +179,7 @@ def superseded_notice(rival: int, issue: int, merged_at: datetime) -> str:
 class GitHub:
     def __init__(self, repository: str, token: str, dry_run: bool = False) -> None:
         self.repository, self.token, self.dry_run = repository, token, dry_run
+        self._maintainer_cache: dict[str, bool] = {}
 
     def request(self, method: str, path: str, body: Any = None, accept: str = "application/vnd.github+json") -> Any:
         url = path if path.startswith("http") else f"{API}/repos/{self.repository}/{path}"
@@ -202,6 +212,29 @@ class GitHub:
             data += self.request(method, following.group(1))
         return data
 
+    def is_maintainer(self, login: str) -> bool:
+        """Return whether ``login`` has admin, maintain, or write access.
+
+        The permission endpoint sees access granted through private organization
+        membership, unlike the PR event's ``author_association`` field. Lookup
+        failures fail closed so admission and queue jobs keep running.
+        """
+        if not login:
+            return False
+        if login not in self._maintainer_cache:
+            try:
+                permission = self.request(
+                    "GET",
+                    f"collaborators/{urllib.parse.quote(login, safe='')}/permission",
+                )
+                role = (permission or {}).get("permission") or (permission or {}).get("role_name")
+                self._maintainer_cache[login] = role in {"admin", "maintain", "write"}
+            except (Exception, SystemExit) as error:
+                if isinstance(error, urllib.error.HTTPError):
+                    error.close()
+                self._maintainer_cache[login] = False
+        return self._maintainer_cache[login]
+
 
 def admitted(github: GitHub, sha: str) -> bool | None:
     runs = github.request("GET", f"commits/{sha}/check-runs?check_name=validate-metadata")["check_runs"]
@@ -211,10 +244,10 @@ def admitted(github: GitHub, sha: str) -> bool | None:
     return finished[0]["conclusion"] == "success"
 
 
-def reconcile(github: GitHub, pr: dict[str, Any], now: datetime, nudge_hours: int, pause_hours: int, ignored: frozenset[str]) -> None:
+def reconcile(github: GitHub, pr: dict[str, Any], now: datetime, nudge_hours: int, pause_hours: int) -> None:
     number = pr["number"]
     events = github.request("GET", f"issues/{number}/timeline?per_page=100")
-    current = turn(pr, events, now, admitted(github, pr["head"]["sha"]), ignored)
+    current = turn(pr, events, now, github.is_maintainer, admitted(github, pr["head"]["sha"]))
     have = {label["name"] for label in pr["labels"]} & set(LABELS.values())
     want, due = plan(current, now, nudge_hours, pause_hours) if current else (None, None)
 
@@ -236,8 +269,8 @@ def reconcile(github: GitHub, pr: dict[str, Any], now: datetime, nudge_hours: in
                 event["user"]["login"]
                 for event in events
                 if event.get("event") == "reviewed"
-                and event.get("author_association") in MAINTAINER
-                and event["user"]["login"] not in ignored | {pr["user"]["login"]}
+                and github.is_maintainer((event.get("user") or {}).get("login", ""))
+                and event["user"]["login"] != pr["user"]["login"]
             } - set(owners))
             github.request("POST", f"issues/{number}/comments", {"body": notice(due, current, now, pr["user"]["login"], owners)})
 
@@ -253,6 +286,7 @@ def is_issue(github: GitHub, number: int) -> bool:
         return "pull_request" not in (github.request("GET", f"issues/{number}") or {"pull_request": None})
     except urllib.error.HTTPError as error:
         if error.code in (404, 410):  # no such issue, or deleted
+            error.close()
             return False
         raise
 
@@ -263,26 +297,93 @@ def check_superseded(github: GitHub, pr: dict[str, Any], events: list[dict[str, 
     Never closes and never changes whose turn it is: the label gives the maintainer one hopper to batch-close from.
     """
     number = pr["number"]
+    if SUPERSEDED in {label["name"] for label in pr["labels"]}:
+        return None  # already flagged; skip the issue lookups on every later sweep
     known, mentioned = linked_issues(pr, events)
     issues = known | {n for n in mentioned if is_issue(github, n)}
     found = merged_rival(pr, {n: github.request("GET", f"issues/{n}/timeline?per_page=100") for n in sorted(issues)})
     if not found:
         return None
     rival, issue, merged_at = found
-    if SUPERSEDED not in {label["name"] for label in pr["labels"]}:
-        github.request("POST", f"issues/{number}/labels", {"labels": [SUPERSEDED]})
     marker = SUPERSEDED_MARKER.format(rival=rival)
-    if not any(
+    if any(
         (event.get("actor") or event.get("user") or {}).get("login") == BOT and (event.get("body") or "").startswith(marker)
         for event in events
     ):
-        github.request("POST", f"issues/{number}/comments", {"body": superseded_notice(rival, issue, merged_at)})
+        return None  # already flagged for this rival; a maintainer who removed the label dismissed it
+    github.request("POST", f"issues/{number}/labels", {"labels": [SUPERSEDED]})
+    github.request("POST", f"issues/{number}/comments", {"body": superseded_notice(rival, issue, merged_at)})
     return rival
 
 
-def queued(pr: dict[str, Any], team: bool) -> bool:
-    """Open pull requests from outside contributors are queued; in team mode, members' too."""
-    return pr["state"] == "open" and (team or pr["author_association"] not in MAINTAINER)
+def numbers(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in re.findall(r"[0-9]+", version))
+
+
+def update_notice(github: GitHub, installed: str, latest: dict[str, Any]) -> str | None:
+    """Open one issue per newer Helicopter release. Closing it skips that release; nothing reopens it."""
+    version = latest["version"]
+    if numbers(version) <= numbers(installed):
+        return None
+    title = f"Helicopter {version} is available"
+    # ponytail: search lags a minute or so, far inside the hourly sweep; it finds closed issues too.
+    query = f'repo:{github.repository} is:issue author:app/github-actions in:title "{title}"'
+    try:
+        found = github.request("GET", f"{API}/search/issues?q={urllib.parse.quote(query)}")
+    except urllib.error.HTTPError as error:
+        # 410 Gone: the repository has issues turned off, so there's nowhere to post. Never fail the sweep for it.
+        error.close()
+        print(f"Update check skipped: {'issues are turned off' if error.code == 410 else error}")
+        return None
+    if any(item["title"] == title for item in (found or {}).get("items", [])):
+        return None
+    steps = latest.get("action_required") or 0
+    body = (
+        f"{UPDATE_MARKER.format(version=version)}\n"
+        f"This repository runs Helicopter {installed}. [{version}](https://github.com/{HELICOPTER}/releases/tag/{version}) is out"
+        + (f", with {steps} Action required step{'s' if steps != 1 else ''} in its release notes.\n\n" if steps else ".\n\n")
+        + "To update, ask your agent to update Helicopter with the `helicopter` skill "
+        f"(`npx skills add {HELICOPTER}`). It opens one pull request for you to review. Close this issue to skip {version}."
+    )
+    try:
+        github.request("POST", "issues", {"title": title, "body": body})
+    except urllib.error.HTTPError as error:
+        error.close()
+        print(f"Update check skipped: {'issues are turned off' if error.code == 410 else error}")
+        return None
+    return version
+
+
+def check_for_update(github: GitHub) -> None:
+    """Never fails the queue: an unreachable release or a missing marker just skips the check."""
+    if not VERSION_FILE.is_file():
+        return
+    try:
+        installed = json.loads(VERSION_FILE.read_text(encoding="utf-8"))["version"]
+        url = f"https://github.com/{HELICOPTER}/releases/latest/download/helicopter.json"
+        with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310 (fixed https URL)
+            latest = json.loads(response.read())
+    except (OSError, ValueError, KeyError) as error:
+        print(f"Update check skipped: {error}")
+        return
+    opened = update_notice(github, installed, latest)
+    print(f"Helicopter {installed}: " + (f"opened an issue for {opened}" if opened else "up to date or already notified"))
+
+
+def repository_bot(pr: dict[str, Any]) -> bool:
+    """A bot on a branch of this repository: it needed write access an administrator granted."""
+    head = ((pr.get("head") or {}).get("repo") or {}).get("id")
+    return (pr.get("user") or {}).get("type") == "Bot" and head is not None and head == ((pr.get("base") or {}).get("repo") or {}).get("id")
+
+
+def queued(pr: dict[str, Any], team: bool, is_maintainer: Callable[[str], bool]) -> bool:
+    """Open pull requests from outside contributors are queued; in team mode, everyone's.
+
+    Bots on branches of this repository count as the maintainer's own delegated work.
+    """
+    if pr["state"] != "open":
+        return False
+    return team or (not is_maintainer((pr.get("user") or {}).get("login", "")) and not repository_bot(pr))
 
 
 def require_labels(github: GitHub, wanted: set[str]) -> None:
@@ -306,18 +407,24 @@ def main() -> int:
     pause_hours = int(os.environ.get("HELICOPTER_QUEUE_PAUSE_HOURS") or 504)
     # Team mode queues members' pull requests too; other modes queue outside contributions only.
     team = os.environ.get("HELICOPTER_MODE") == "team"
-    ignored = frozenset(filter(None, re.split(r"[\s,]+", os.environ.get("HELICOPTER_AUTOMATION_LOGINS", ""))))
     now = datetime.now(timezone.utc)
-    require_labels(github, set(LABELS.values()) | {SUPERSEDED})
 
-    # ponytail: one timeline call per open PR, plus one per linked issue; fine to a few hundred open PRs per sweep
-    # (GITHUB_TOKEN allows 1,000 requests/hour). Batch through GraphQL beyond that.
+    # ponytail: about 3 calls per open PR per sweep (check runs, timeline, one per linked issue until flagged), so the
+    # hourly sweep fits ~300 open PRs in GITHUB_TOKEN's 1,000 requests/hour. Beyond that, lower the cron or batch via GraphQL.
     pulls = [github.request("GET", f"pulls/{args.pr}")] if args.pr else github.request("GET", "pulls?state=open&per_page=100")
+    work = []
     for pr in pulls:
-        if not queued(pr, team):
-            print(f"#{pr['number']}: skipped ({pr['state'] if pr['state'] != 'open' else 'maintainer-authored'})")
-            continue
-        reconcile(github, pr, now, nudge_hours, pause_hours, ignored)
+        if queued(pr, team, github.is_maintainer):
+            work.append(pr)
+        else:
+            print(f"#{pr['number']}: skipped ({pr['state'] if pr['state'] != 'open' else 'maintainer or repository bot'})")
+    if work:
+        # Only when something needs a label: an idle repository without the labels stays green.
+        require_labels(github, set(LABELS.values()) | {SUPERSEDED})
+    for pr in work:
+        reconcile(github, pr, now, nudge_hours, pause_hours)
+    if not args.pr:
+        check_for_update(github)
     return 0
 
 

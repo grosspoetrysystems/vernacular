@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from configure_repository import baseline, protection, tag_ruleset
-from validate_pr import validate_body
+from validate_pr import _metadata_exempt, validate_body, validate_signoff
 
 SCRIPT = ROOT / "scripts" / "validate_pr.py"
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
@@ -35,11 +36,15 @@ def run_cli(event: dict[str, object], *arguments: str) -> subprocess.CompletedPr
     with tempfile.TemporaryDirectory() as directory:
         event_path = Path(directory) / "event.json"
         event_path.write_text(json.dumps(event), encoding="utf-8")
+        env = os.environ.copy()
+        env.pop("GITHUB_TOKEN", None)
+        env.pop("GITHUB_REPOSITORY", None)
         return subprocess.run(
             [sys.executable, str(SCRIPT), str(event_path), *arguments],
             check=False,
             capture_output=True,
             text=True,
+            env=env,
         )
 
 
@@ -47,6 +52,7 @@ def owner_event(
     *,
     author_id: int = 1,
     author_type: str = "User",
+    author_login: str = "alice",
     owner_type: str = "User",
     owner_id: int = 1,
     sender_id: int = 1,
@@ -61,7 +67,7 @@ def owner_event(
         "pull_request": {
             "author_association": author_association,
             "body": "",
-            "user": {"id": author_id, "type": author_type},
+            "user": {"id": author_id, "login": author_login, "type": author_type},
             "base": {"repo": {"id": 100, "owner": {"id": owner_id, "type": owner_type}}},
             "head": {"repo": {"id": head_repository_id}},
         },
@@ -96,7 +102,7 @@ class ValidateBodyTests(unittest.TestCase):
         body = (
             TEMPLATE.read_text(encoding="utf-8")
             .replace("Closes #", "Fixes the queue label.\n\nCloses #12")
-            .replace("<commands and concise result; project CI verifies independently>", "unittest: 40 passed")
+            .replace("<commands and results; say what you couldn't run or test. Project CI verifies independently.>", "unittest: 40 passed")
             .replace("- [ ] None of the above", "- [x] None of the above")
         )
         self.assertEqual(codes(body), set())
@@ -139,55 +145,139 @@ class ValidateBodyTests(unittest.TestCase):
                 result = run_cli(owner_event(), "--mode", mode, "--solo-maintainer-id", "1")
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
-    def test_team_mode_exempts_trusted_same_repository_authors(self) -> None:
-        for association in ("OWNER", "MEMBER", "COLLABORATOR"):
+    def test_team_mode_uses_permission_lookup_not_author_association(self) -> None:
+        lookup = lambda login: login == "alice"
+        for association in ("OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"):
             with self.subTest(association=association):
-                result = run_cli(
-                    owner_event(
-                        author_association=association,
-                        owner_id=200,
-                        owner_type="Organization",
-                    ),
-                    "--mode",
-                    "team",
+                event = owner_event(
+                    author_association=association,
+                    owner_id=200,
+                    owner_type="Organization",
                 )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertTrue(_metadata_exempt(event, "team", 0, lookup))
+
+        outsider = owner_event(
+            author_association="CONTRIBUTOR",
+            owner_id=200,
+            owner_type="Organization",
+            author_login="outsider",
+        )
+        self.assertFalse(_metadata_exempt(outsider, "team", 0, lookup))
 
         refused = (
-            owner_event(author_association="NONE", owner_id=200, owner_type="Organization"),
             owner_event(author_association="MEMBER", head_repository_id=101),
             owner_event(author_association="MEMBER", sender_id=2),
             owner_event(author_association="MEMBER", author_type="Bot"),
         )
         for event in refused:
-            result = run_cli(event, "--mode", "team")
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertFalse(_metadata_exempt(event, "team", 0, lookup))
 
 
-class AuthorizedAutomationTests(unittest.TestCase):
+class RepositoryBotTests(unittest.TestCase):
     def bot_event(self, login: str = "dependabot[bot]", head_repository_id: int = 100) -> dict[str, object]:
         event = owner_event(author_type="Bot", sender_type="Bot", head_repository_id=head_repository_id)
         event["pull_request"]["user"]["login"] = login
         event["sender"]["login"] = login
         return event
 
-    def test_listed_bot_on_a_repository_branch_is_admitted(self) -> None:
-        result = run_cli(self.bot_event(), "--automation-logins", "dependabot[bot], renovate[bot]")
-        self.assertEqual(result.returncode, 0, result.stdout)
+    def test_any_bot_on_a_repository_branch_is_admitted_without_a_list(self) -> None:
+        for login in ("dependabot[bot]", "renovate[bot]"):
+            result = run_cli(self.bot_event(login=login))
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("authorized by its write access", result.stdout)
 
-    def test_unlisted_bot_or_fork_follows_the_contract(self) -> None:
-        for event, logins in (
-            (self.bot_event(login="other[bot]"), "dependabot[bot]"),
-            (self.bot_event(head_repository_id=101), "dependabot[bot]"),
-            (self.bot_event(), ""),
-        ):
-            result = run_cli(event, "--automation-logins", logins)
+    def test_bot_on_a_fork_or_acting_for_another_sender_is_refused(self) -> None:
+        fork = self.bot_event(head_repository_id=101)
+        relayed = self.bot_event()
+        relayed["sender"]["login"] = "someone-else[bot]"
+        for event in (fork, relayed):
+            event["pull_request"]["body"] = VALID
+            result = run_cli(event)
             self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn("REFUSE_BOT_UNAUTHORIZED", result.stdout)
 
-    def test_listed_login_must_be_a_bot(self) -> None:
+    def test_a_person_named_like_a_bot_is_not_exempt(self) -> None:
         event = owner_event(author_association="NONE")
         event["pull_request"]["user"]["login"] = event["sender"]["login"] = "dependabot[bot]"
-        self.assertEqual(run_cli(event, "--automation-logins", "dependabot[bot]").returncode, 1)
+        self.assertEqual(run_cli(event).returncode, 1)
+
+
+def commit(sha: str, email: str, message: str, parents: int = 1) -> dict[str, object]:
+    return {"sha": sha, "parents": [{}] * parents, "commit": {"author": {"email": email}, "message": message}}
+
+
+class SignoffTests(unittest.TestCase):
+    def test_each_commit_needs_its_authors_signoff(self) -> None:
+        signed = commit("aaaaaaa1", "Ann@Example.com", "fix\n\nSigned-off-by: Ann <ann@example.com>\n")
+        other = commit("bbbbbbb2", "bob@example.com", "fix\n\nSigned-off-by: Ann <ann@example.com>")
+        prose = commit("ccccccc3", "cat@example.com", "says Signed-off-by: Cat <cat@example.com> inline")
+        merge = commit("ddddddd4", "web@github.com", "Merge branch main", parents=2)
+        self.assertEqual(validate_signoff([signed, merge]), [])
+        refusal, = validate_signoff([[signed, other], [prose]])  # --slurp pages
+        self.assertEqual(refusal.code, "REFUSE_SIGNOFF_MISSING")
+        self.assertIn("bbbbbbb, ccccccc", refusal.message)
+        self.assertNotIn("aaaaaaa", refusal.message)
+
+    def test_cli_checks_signoff_only_when_commits_are_given(self) -> None:
+        event = owner_event(author_association="NONE", author_id=2, sender_id=2)
+        event["pull_request"]["body"] = VALID
+        self.assertEqual(run_cli(event).returncode, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commits.json"
+            path.write_text(json.dumps([[commit("eeeeeee5", "x@example.com", "unsigned")]]), encoding="utf-8")
+            result = run_cli(event, "--commits", str(path))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_SIGNOFF_MISSING", result.stdout)
+
+
+class OpenPullRequestLimitTests(unittest.TestCase):
+    def run_with(self, association: str, open_prs: int, limit: str = "2") -> subprocess.CompletedProcess[str]:
+        event = owner_event(author_association=association, author_id=2, sender_id=2)
+        event["pull_request"]["body"] = VALID
+        return run_cli(event, "--open-prs", str(open_prs), "--open-pr-limit", limit)
+
+    def test_outside_contributors_are_held_to_the_limit(self) -> None:
+        self.assertEqual(self.run_with("NONE", 2).returncode, 0)
+        result = self.run_with("FIRST_TIME_CONTRIBUTOR", 3)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_OPEN_PR_LIMIT", result.stdout)
+
+    def test_collaborator_association_does_not_bypass_without_permission_lookup(self) -> None:
+        result = self.run_with("COLLABORATOR", 9)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_OPEN_PR_LIMIT", result.stdout)
+        self.assertEqual(self.run_with("NONE", 9, limit="0").returncode, 0)
+
+
+class ShapeTests(unittest.TestCase):
+    def run_with(self, association: str = "NONE", *arguments: str, **pull_request: object) -> subprocess.CompletedProcess[str]:
+        event = owner_event(author_association=association, author_id=2, sender_id=2)
+        event["repository"]["default_branch"] = "main"
+        event["pull_request"]["base"]["ref"] = pull_request.pop("base_ref", "main")
+        event["pull_request"].update({"body": VALID, **pull_request})
+        return run_cli(event, *arguments)
+
+    def test_drafts_skip_admission(self) -> None:
+        event = owner_event(author_association="NONE", author_id=2, sender_id=2)
+        event["pull_request"]["draft"] = True
+        self.assertEqual(run_cli(event).returncode, 0)  # empty body: checked once it's ready for review
+
+    def test_outside_contributions_target_the_default_branch(self) -> None:
+        self.assertEqual(self.run_with().returncode, 0)
+        result = self.run_with(base_ref="release/1.x")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_BASE_BRANCH", result.stdout)
+
+    def test_size_limits_count_lines_and_files_and_zero_turns_them_off(self) -> None:
+        self.assertEqual(self.run_with(additions=4000, deletions=1000, changed_files=300).returncode, 0)
+        for size in ({"additions": 4000, "deletions": 1001}, {"changed_files": 301}):
+            result = self.run_with(**size)
+            self.assertEqual(result.returncode, 1, size)
+            self.assertIn("REFUSE_TOO_LARGE", result.stdout)
+        self.assertEqual(self.run_with("NONE", "--max-changed-lines", "0", additions=9999).returncode, 0)
+        result = self.run_with("NONE", additions=9999)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("REFUSE_TOO_LARGE", result.stdout)
 
 
 class ConfigureRepositoryTests(unittest.TestCase):

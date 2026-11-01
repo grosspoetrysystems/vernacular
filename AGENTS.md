@@ -27,3 +27,7 @@ python3 -m unittest discover -s tests -v
 ```
 
 Keep the CLI to `init`, `attach`, `path`, `status`, `promote`, `stash`, and `burn` unless a new command has proven itself in use. Shell out to `git`; do not add a Git library.
+
+## Contribution controls
+
+Contribution governance comes from Helicopter; the installed release is recorded in `.github/helicopter/version.json`. Use the upstream helicopter skill to update or check it (https://github.com/grosspoetrysystems/helicopter/tree/main/skills/helicopter).
